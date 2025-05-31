@@ -24,6 +24,6 @@ fn vs_main(
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let tex = textureLoad(texture, vec2<i32>(vertex.tex_coord * 256.0), 0);
+    let tex = textureLoad(texture, vec2<i32>(vertex.tex_coord), 0);
     return vec4<f32>(tex) / 255.0;
 }

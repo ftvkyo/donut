@@ -1,6 +1,7 @@
 use std::{borrow::Cow, mem::offset_of, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
+use image::ImageReader;
 use log::info;
 use rgb::Rgba;
 use wgpu::util::DeviceExt;
@@ -22,57 +23,20 @@ fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
     fn v(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
         Vertex {
             _pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32, 1.0],
-            _tex_coord: [tc[0] as f32, tc[1] as f32],
+            _tex_coord: [tc[0] as f32 * 16.0, tc[1] as f32 * 16.0],
         }
     }
 
     let vertex_data = [
-        v([-1, -1, 0], [0, 0]),
-        v([1, -1, 0], [1, 0]),
-        v([1, 1, 0], [1, 1]),
-        v([-1, 1, 0], [0, 1]),
+        v([-1, -1, 0], [0, 1]),
+        v([1, -1, 0], [1, 1]),
+        v([1, 1, 0], [1, 0]),
+        v([-1, 1, 0], [0, 0]),
     ];
 
     let index_data: &[u16] = &[0, 1, 2, 2, 3, 0];
 
     (vertex_data.to_vec(), index_data.to_vec())
-}
-
-fn create_texels(size: usize) -> Vec<Rgba<u8>> {
-    let line_factor = 1;
-    let arrow_size = 10;
-
-    let c = size as isize / 2;
-
-    (0..size * size)
-        .map(|i| {
-            let x = (i % size) as isize - c;
-            let y = (i / size) as isize - c;
-
-            let mut r = 0;
-            let mut g = 0;
-            let mut b = 0;
-
-            if x.abs() <= line_factor {
-                r = 255;
-            }
-
-            if y.abs() <= line_factor {
-                g = 255;
-            }
-
-            if ((y + x - c).abs() <= line_factor
-                || (y - x + c).abs() <= line_factor
-                || (y - x - c).abs() <= line_factor)
-                && (x.abs() < arrow_size || y.abs() < arrow_size)
-                && (y > -x)
-            {
-                b = 255;
-            }
-
-            return Rgba { r, g, b, a: 255 };
-        })
-        .collect()
 }
 
 fn generate_matrix(aspect_ratio: f32) -> glam::Mat4 {
@@ -168,7 +132,7 @@ impl State {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let texture_size = 256u32;
+        let texture_size = 16u32;
         let texture_extent = wgpu::Extent3d {
             width: texture_size,
             height: texture_size,
@@ -186,13 +150,19 @@ impl State {
             view_formats: &[],
         });
 
-        let texels = create_texels(texture_size as usize);
+        let texels = ImageReader::open("src/texture.webp")
+            .unwrap()
+            .decode()
+            .unwrap()
+            .to_rgba8()
+            .into_raw();
+
         queue.write_texture(
             texture.as_image_copy(),
             bytemuck::cast_slice(&texels),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(texture_size * size_of_val(&texels[0]) as u32),
+                bytes_per_row: Some(texture_size * size_of::<Rgba<u8>>() as u32),
                 rows_per_image: None,
             },
             texture_extent,
