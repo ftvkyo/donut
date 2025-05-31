@@ -1,19 +1,45 @@
-fn init_logging() {
-    use env_logger::{Builder, Env};
+use std::error::Error;
 
-    let filter = if cfg!(debug_assertions) {
-        "info"
+use log::{debug, error, info};
+
+mod app;
+
+fn init_logging() {
+    use log::LevelFilter;
+
+    let level = if cfg!(debug_assertions) {
+        LevelFilter::Debug
     } else {
-        "warn"
+        LevelFilter::Info
     };
 
-    let env = Env::default().default_filter_or(filter);
+    env_logger::builder()
+        .filter_module(module_path!(), level)
+        .parse_default_env()
+        .init();
+}
 
-    Builder::from_env(env).init();
+fn run() -> Result<(), Box<dyn Error>> {
+    use winit::event_loop::{ControlFlow, EventLoop};
+
+    debug!("Creating event loop...");
+    let event_loop = EventLoop::new()?;
+    event_loop.set_control_flow(ControlFlow::Poll);
+
+    debug!("Creating the app...");
+    let mut app = app::App::default();
+
+    debug!("Running the app...");
+    event_loop.run_app(&mut app)?;
+
+    Ok(())
 }
 
 fn main() {
     init_logging();
 
-    log::info!("Hello, world!");
+    match run() {
+        Ok(()) => info!("Done."),
+        Err(err) => error!("Encountered a error: {err}"),
+    }
 }

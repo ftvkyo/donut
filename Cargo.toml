@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 env_logger = { version = "0.11.8", default-features = false, features = ["auto-color", "humantime"] }
 log = "0.4.27"
+pollster = "0.4.0"
+wgpu = { version = "25.0.2", default-features = false, features = ["metal", "vulkan", "wgsl"] }
+winit = { version = "0.30.11", default-features = false, features = ["wayland", "wayland-dlopen", "x11", "rwh_06"] }
