@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use log::info;
 use winit::{
@@ -15,6 +15,7 @@ struct State {
     size: winit::dpi::PhysicalSize<u32>,
     surface: wgpu::Surface<'static>,
     surface_format: wgpu::TextureFormat,
+    pipeline: wgpu::RenderPipeline,
 }
 
 impl State {
@@ -29,6 +30,11 @@ impl State {
             .await
             .expect("Failed to acquire a device");
 
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+        });
+
         let size = window.inner_size();
 
         let surface = instance.create_surface(window.clone()).unwrap();
@@ -39,6 +45,29 @@ impl State {
             .get(0)
             .expect("No supported surface formats");
 
+        let pipeline_layout = device.create_pipeline_layout(&Default::default());
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(surface_format.into())],
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview: None,
+            cache: None,
+        });
+
         let state = State {
             window,
             device,
@@ -46,6 +75,7 @@ impl State {
             size,
             surface,
             surface_format,
+            pipeline,
         };
 
         state.configure_surface();
@@ -97,7 +127,7 @@ impl State {
         let mut encoder = self.device.create_command_encoder(&Default::default());
 
         {
-            let _rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &texture_view,
@@ -111,6 +141,9 @@ impl State {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
+
+            rpass.set_pipeline(&self.pipeline);
+            rpass.draw(0..3, 0..1);
         }
 
         self.queue.submit([encoder.finish()]);
