@@ -37,20 +37,48 @@ fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
     (vertex_data.to_vec(), index_data.to_vec())
 }
 
-fn create_texels(size: usize) -> Vec<u8> {
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
+}
+
+fn create_texels(size: usize) -> Vec<Color> {
+    let line_factor = 1;
+    let arrow_size = 10;
+
+    let c = size as isize / 2;
+
     (0..size * size)
-        .map(|id| {
-            // get high five for recognizing this ;)
-            let cx = 3.0 * (id % size) as f32 / (size - 1) as f32 - 2.0;
-            let cy = 2.0 * (id / size) as f32 / (size - 1) as f32 - 1.0;
-            let (mut x, mut y, mut count) = (cx, cy, 0);
-            while count < 0xFF && x * x + y * y < 4.0 {
-                let old_x = x;
-                x = x * x - y * y + cx;
-                y = 2.0 * old_x * y + cy;
-                count += 1;
+        .map(|i| {
+            let x = (i % size) as isize - c;
+            let y = (i / size) as isize - c;
+
+            let mut r = 0;
+            let mut g = 0;
+            let mut b = 0;
+
+            if x.abs() <= line_factor {
+                r = 255;
             }
-            count
+
+            if y.abs() <= line_factor {
+                g = 255;
+            }
+
+            if ((y + x - c).abs() <= line_factor
+                || (y - x + c).abs() <= line_factor
+                || (y - x - c).abs() <= line_factor)
+                && (x.abs() < arrow_size || y.abs() < arrow_size)
+                && (y > -x)
+            {
+                b = 255;
+            }
+
+            return Color { r, g, b, a: 255 };
         })
         .collect()
 }
@@ -161,7 +189,7 @@ impl State {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Uint,
+            format: wgpu::TextureFormat::Rgba8Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
@@ -169,10 +197,10 @@ impl State {
         let texels = create_texels(texture_size as usize);
         queue.write_texture(
             texture.as_image_copy(),
-            &texels,
+            bytemuck::cast_slice(&texels),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(texture_size),
+                bytes_per_row: Some(texture_size * size_of::<Color>() as u32),
                 rows_per_image: None,
             },
             texture_extent,
@@ -372,7 +400,7 @@ impl ApplicationHandler for App {
                 .create_window(
                     Window::default_attributes()
                         .with_inner_size(window_size)
-                        .with_resizable(false)
+                        .with_resizable(false),
                 )
                 .unwrap(),
         );
