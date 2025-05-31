@@ -3,6 +3,8 @@ use std::error::Error;
 use log::{debug, error, info};
 
 mod app;
+mod game;
+mod renderer;
 
 fn init_logging() {
     use log::LevelFilter;
