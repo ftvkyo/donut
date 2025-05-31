@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bytemuck = "1.23.0"
 env_logger = { version = "0.11.8", default-features = false, features = ["auto-color", "humantime"] }
+glam = { version = "0.30.3", features = ["bytemuck"] }
 log = "0.4.27"
 pollster = "0.4.0"
 wgpu = { version = "25.0.2", default-features = false, features = ["metal", "vulkan", "wgsl"] }
