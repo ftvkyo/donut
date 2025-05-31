@@ -6,7 +6,7 @@ use rgb::Rgba;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
-use crate::game::Level;
+use crate::game::Game;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
@@ -43,7 +43,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: Arc<Window>) -> Renderer {
+    pub async fn new(window: Arc<Window>, game: &Game /* TODO: only pass what's necessary */) -> Renderer {
         let instance = wgpu::Instance::new(&Default::default());
         let adapter = instance
             .request_adapter(&Default::default())
@@ -163,8 +163,7 @@ impl Renderer {
             ],
         });
 
-        let level = Level::default();
-        let (vertex_data, index_data) = level.vertex_data(tile_size);
+        let (vertex_data, index_data) = game.level.vertex_data(tile_size);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -276,7 +275,7 @@ impl Renderer {
         );
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, _game: &Game) {
         let surface_texture = self
             .surface
             .get_current_texture()

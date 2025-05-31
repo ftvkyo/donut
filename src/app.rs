@@ -8,11 +8,12 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::renderer::Renderer;
+use crate::{game::Game, renderer::Renderer};
 
 #[derive(Default)]
 pub struct App {
     renderer: Option<Renderer>,
+    game: Game,
 }
 
 impl ApplicationHandler for App {
@@ -29,7 +30,7 @@ impl ApplicationHandler for App {
                 .unwrap(),
         );
 
-        let state = pollster::block_on(Renderer::new(window.clone()));
+        let state = pollster::block_on(Renderer::new(window.clone(), &self.game));
         self.renderer = Some(state);
 
         window.request_redraw();
@@ -43,7 +44,7 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                renderer.render();
+                renderer.render(&self.game);
                 renderer.get_window().request_redraw();
             }
             WindowEvent::Resized(size) => {

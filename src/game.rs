@@ -77,3 +77,8 @@ impl Default for Level {
         Self { tiles }
     }
 }
+
+#[derive(Default)]
+pub struct Game {
+    pub level: Level,
+}
