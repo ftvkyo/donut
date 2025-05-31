@@ -365,9 +365,15 @@ pub struct App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let window_size = winit::dpi::LogicalSize::new(1366, 768);
+
         let window = Arc::new(
             event_loop
-                .create_window(Window::default_attributes())
+                .create_window(
+                    Window::default_attributes()
+                        .with_inner_size(window_size)
+                        .with_resizable(false)
+                )
                 .unwrap(),
         );
 
