@@ -2,6 +2,7 @@ use std::{borrow::Cow, mem::offset_of, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
 use log::info;
+use rgb::Rgba;
 use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
@@ -37,16 +38,7 @@ fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
     (vertex_data.to_vec(), index_data.to_vec())
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
-}
-
-fn create_texels(size: usize) -> Vec<Color> {
+fn create_texels(size: usize) -> Vec<Rgba<u8>> {
     let line_factor = 1;
     let arrow_size = 10;
 
@@ -78,7 +70,7 @@ fn create_texels(size: usize) -> Vec<Color> {
                 b = 255;
             }
 
-            return Color { r, g, b, a: 255 };
+            return Rgba { r, g, b, a: 255 };
         })
         .collect()
 }
@@ -200,7 +192,7 @@ impl State {
             bytemuck::cast_slice(&texels),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(texture_size * size_of::<Color>() as u32),
+                bytes_per_row: Some(texture_size * size_of_val(&texels[0]) as u32),
                 rows_per_image: None,
             },
             texture_extent,
