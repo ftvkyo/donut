@@ -1,7 +1,6 @@
 use std::{borrow::Cow, mem::offset_of, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
-use image::ImageReader;
 use rgb::Rgba;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
@@ -16,13 +15,16 @@ pub struct Vertex {
 }
 
 fn generate_matrix(aspect_ratio: f32) -> glam::Mat4 {
+    let camera = glam::Vec3::new(4.0, 4.0, 4.0);
+
     let projection =
         glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, aspect_ratio, 1.0, 10.0);
-    let view = glam::Mat4::look_at_rh(
-        glam::Vec3::new(0.0, 0.0, 3.0),
-        glam::Vec3::ZERO,
+    let view = glam::Mat4::look_to_rh(
+        camera,
+        glam::Vec3::NEG_Z,
         glam::Vec3::Y,
     );
+
     projection * view
 }
 
@@ -108,19 +110,11 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let tile_size = 16u16;
-
-        let texture_image = ImageReader::open("src/texture.webp")
-            .unwrap()
-            .decode()
-            .unwrap()
-            .into_rgba8();
-
-        let texture_bytes_per_row = texture_image.width() * size_of::<Rgba<u8>>() as u32;
+        let texture_bytes_per_row = game.texture.width() * size_of::<Rgba<u8>>() as u32;
 
         let texture_extent = wgpu::Extent3d {
-            width: texture_image.width(),
-            height: texture_image.height(),
+            width: game.texture.width(),
+            height: game.texture.height(),
             depth_or_array_layers: 1,
         };
 
@@ -137,7 +131,7 @@ impl Renderer {
 
         queue.write_texture(
             texture.as_image_copy(),
-            bytemuck::cast_slice(&texture_image.into_raw()),
+            bytemuck::cast_slice(&game.texture.clone().into_raw()),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(texture_bytes_per_row),
@@ -163,7 +157,7 @@ impl Renderer {
             ],
         });
 
-        let (vertex_data, index_data) = game.level.vertex_data(tile_size);
+        let (vertex_data, index_data) = game.vertex_data();
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -298,7 +292,7 @@ impl Renderer {
                     view: &texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 }),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

@@ -1,101 +1,302 @@
-use std::array::from_fn;
+use std::error::Error;
 
-use crate::renderer::Vertex;
+use anyhow::{bail, Context};
+use enumset::EnumSet;
+use log::trace;
 
-pub const LEVEL_SIZE: usize = 16;
+use crate::{
+    assets::{Assets, Texture, TilePiece, TilePieceDesignation as TPD},
+    renderer::Vertex,
+};
 
-pub struct Tile {
-    texture: [u16; 2],
+#[derive(Debug)]
+pub struct Sprite {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+
+    pub w: f32,
+    pub h: f32,
+
+    pub tex_x: f32,
+    pub tex_y: f32,
+
+    pub tex_w: f32,
+    pub tex_h: f32,
 }
 
-pub struct Level {
-    tiles: [[Option<Tile>; LEVEL_SIZE]; LEVEL_SIZE],
-}
-
-impl Level {
-    pub fn vertex_data(&self, tile_size: u16) -> (Vec<Vertex>, Vec<u16>) {
-        let v = |pos: [i16; 3], tc: [u16; 2]| -> Vertex {
+impl Sprite {
+    pub fn vertex_data(&self) -> [Vertex; 4] {
+        [
             Vertex {
-                pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32, 1.0],
-                tex_coord: [(tc[0] * tile_size) as f32, (tc[1] * tile_size) as f32],
-            }
-        };
+                pos: [self.x, self.y, self.z, 1.0],
+                tex_coord: [self.tex_x, self.tex_y + self.tex_h],
+            },
+            Vertex {
+                pos: [self.x + self.w, self.y, self.z, 1.0],
+                tex_coord: [self.tex_x + self.tex_w, self.tex_y + self.tex_h],
+            },
+            Vertex {
+                pos: [self.x + self.w, self.y + self.h, self.z, 1.0],
+                tex_coord: [self.tex_x + self.tex_w, self.tex_y],
+            },
+            Vertex {
+                pos: [self.x, self.y + self.h, self.z, 1.0],
+                tex_coord: [self.tex_x, self.tex_y],
+            },
+        ]
+    }
 
-        let mut i = 0;
+    pub fn index_data(&self, offset: u16) -> [u16; 6] {
+        [
+            offset + 0,
+            offset + 1,
+            offset + 2,
+            offset + 2,
+            offset + 3,
+            offset + 0,
+        ]
+    }
+}
 
-        let mut vertex_data = Vec::with_capacity(self.tiles.len() * 4);
-        let mut index_data = Vec::with_capacity(self.tiles.len() * 6);
+pub struct StageLayer {
+    inner: Vec<Vec<bool>>,
+}
 
-        for (x, tile_column) in self.tiles.iter().enumerate() {
-            for (y, tile) in tile_column.iter().enumerate() {
-                if let Some(tile) = tile {
-                    let x = x as i16;
-                    let y = y as i16;
+impl StageLayer {
+    pub fn new<S: AsRef<str>>(s: S) -> Self {
+        let inner = s.as_ref()
+            .trim()
+            .split('\n')
+            .rev()
+            .map(|row| row.chars().map(|c| c == 'x').collect())
+            .collect();
 
-                    vertex_data.extend_from_slice(&[
-                        v(
-                            [x, y, 0],
-                            [tile.texture[0], tile.texture[1] + 1],
-                        ),
-                        v(
-                            [x + 1, y, 0],
-                            [tile.texture[0] + 1, tile.texture[1] + 1],
-                        ),
-                        v(
-                            [x + 1, y + 1, 0],
-                            [tile.texture[0] + 1, tile.texture[1]],
-                        ),
-                        v(
-                            [x, y + 1, 0],
-                            [tile.texture[0], tile.texture[1]],
-                        ),
-                    ]);
+        Self {
+            inner,
+        }
+    }
 
-                    index_data.extend_from_slice(&[
-                        i + 0,
-                        i + 1,
-                        i + 2,
-                        i + 2,
-                        i + 3,
-                        i + 0,
-                    ]);
+    fn is_filled(&self, x: isize, y: isize) -> bool {
+        if x < 0 || y < 0 {
+            return false;
+        }
 
-                    i += 4;
-                }
+        if let Some(row) = self.inner.get(y as usize) {
+            if let Some(cell) = row.get(x as usize) {
+                return *cell;
             }
         }
 
-        (vertex_data.to_vec(), index_data.to_vec())
+        return false;
     }
 }
 
-impl Default for Level {
-    fn default() -> Self {
-        let mut tiles = from_fn(|_| from_fn(|_| {
-            None
-        }));
+impl std::fmt::Debug for StageLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut st = f.debug_struct("StageLayer");
 
-        tiles[0][0] = Some(Tile {
-            texture: [0, 0],
-        });
+        for (irow, row) in self.inner.iter().enumerate().rev() {
+            let row: String = row.iter().map(|c| if *c { 'x' } else { '_' }).collect();
+            st.field(&format!("y={irow}"), &row);
+        }
 
-        tiles[2][0] = Some(Tile {
-            texture: [0, 3],
-        });
-
-        tiles[2][1] = Some(Tile {
-            texture: [0, 4],
-        });
-
-        tiles[3][1] = Some(Tile {
-            texture: [3, 0],
-        });
-
-        Self { tiles }
+        st.finish()
     }
 }
 
-#[derive(Default)]
+pub struct StageLayerResolver<'a, 'b> {
+    pub tile_piece_size: usize,
+    pub tile_pieces: &'a Vec<TilePiece>,
+    pub stage_layer: &'b StageLayer,
+}
+
+impl<'a> StageLayerResolver<'a, '_> {
+    fn select_tile_piece(&self, designation: EnumSet<TPD>) -> anyhow::Result<&'a TilePiece> {
+        /* TODO: weighted selection if there are multiple matches */
+
+        for tile_piece in self.tile_pieces {
+            if tile_piece.is == designation {
+                return Ok(tile_piece);
+            }
+        }
+
+        bail!("No tile piece with designation {designation:?}");
+    }
+
+    pub fn resolve(self, stage_layer_size: usize) -> anyhow::Result<Vec<Sprite>> {
+        let mut sprites = vec![];
+
+        let (w, h) = (0.5, 0.5);
+
+        let tex_w = self.tile_piece_size as f32;
+        let tex_h = self.tile_piece_size as f32;
+
+        let sprite = |x, y, tex_x, tex_y| Sprite {
+            x,
+            y,
+            w,
+            h,
+            z: 0.0,
+            tex_x: tex_x as f32 * tex_w,
+            tex_y: tex_y as f32 * tex_h,
+            tex_w,
+            tex_h,
+        };
+
+        for x in 0..stage_layer_size as isize {
+            for y in 0..stage_layer_size as isize {
+                if !self.stage_layer.is_filled(x, y) {
+                    continue;
+                }
+
+                let filled_r = self.stage_layer.is_filled(x + 1, y);
+                let filled_tr = self.stage_layer.is_filled(x + 1, y + 1);
+                let filled_t = self.stage_layer.is_filled(x, y + 1);
+                let filled_tl = self.stage_layer.is_filled(x - 1, y + 1);
+                let filled_l = self.stage_layer.is_filled(x - 1, y);
+                let filled_bl = self.stage_layer.is_filled(x - 1, y - 1);
+                let filled_b = self.stage_layer.is_filled(x, y - 1);
+                let filled_br = self.stage_layer.is_filled(x + 1, y - 1);
+
+                let (x, y) = (x as f32, y as f32);
+
+                // Top-left quarter of the tile.
+                // Never bottom nor right.
+                let mut tpds_tl = EnumSet::new();
+
+                // Top-right quarter of the tile.
+                // Never bottom nor left.
+                let mut tpds_tr = EnumSet::new();
+
+                // Bottom-right quarter of the tile.
+                // Never top nor left.
+                let mut tpds_br = EnumSet::new();
+
+                // Bottom-left quarter of the tile.
+                // Never top nor right.
+                let mut tpds_bl = EnumSet::new();
+
+                if !filled_t {
+                    tpds_tl |= TPD::Top;
+                    tpds_tr |= TPD::Top;
+                }
+
+                if !filled_r {
+                    tpds_tr |= TPD::Right;
+                    tpds_br |= TPD::Right;
+                }
+
+                if !filled_b {
+                    tpds_br |= TPD::Bottom;
+                    tpds_bl |= TPD::Bottom;
+                }
+
+                if !filled_l {
+                    tpds_tl |= TPD::Left;
+                    tpds_bl |= TPD::Left;
+                }
+
+                if filled_t && filled_l && !filled_tl {
+                    tpds_tl |= TPD::Inner | TPD::Top | TPD::Left;
+                }
+
+                if filled_t && filled_r && !filled_tr {
+                    tpds_tr |= TPD::Inner | TPD::Top | TPD::Right ;
+                }
+
+                if filled_b && filled_r && !filled_br {
+                    tpds_br |= TPD::Inner | TPD::Bottom | TPD::Right;
+                }
+
+                if filled_b && filled_l && !filled_bl {
+                    tpds_bl |= TPD::Inner | TPD::Bottom | TPD::Left;
+                }
+
+                let tp_tl = self.select_tile_piece(tpds_tl)
+                    .with_context(|| format!("top-left quarter of tile at x={x} y={y}"))?;
+
+                sprites.push(sprite(x, y + h, tp_tl.x, tp_tl.y));
+
+                let tp_tr = self.select_tile_piece(tpds_tr)
+                    .with_context(|| format!("top-right quarter of tile at x={x} y={y}"))?;
+
+                sprites.push(sprite(x + w, y + h, tp_tr.x, tp_tr.y));
+
+                let tp_br = self.select_tile_piece(tpds_br)
+                    .with_context(|| format!("bottom-right quarter of tile at x={x} y={y}"))?;
+
+                sprites.push(sprite(x + w, y, tp_br.x, tp_br.y));
+
+                let tp_bl = self.select_tile_piece(tpds_bl)
+                    .with_context(|| format!("bottom-left quarter of tile at x={x} y={y}"))?;
+
+                sprites.push(sprite(x, y, tp_bl.x, tp_bl.y));
+            }
+        }
+
+        Ok(sprites)
+    }
+}
+
 pub struct Game {
-    pub level: Level,
+    pub texture: Texture,
+    pub sprites: Vec<Sprite>,
+}
+
+impl TryFrom<Assets> for Game {
+    type Error = Box<dyn Error>;
+
+    fn try_from(assets: Assets) -> Result<Self, Self::Error> {
+        let texture = assets
+            .tile_sets_textures
+            .into_iter()
+            .next()
+            .ok_or("zero tile set textures loaded?")?;
+
+        let stage = assets
+            .config
+            .stages
+            .into_iter()
+            .next()
+            .ok_or("zero stages declared?")?;
+
+        let layer = stage
+            .layers
+            .into_iter()
+            .next()
+            .ok_or("zero stage layers declared?")?;
+
+        let stage_layer = StageLayer::new(layer.tile_map);
+
+        let slr = StageLayerResolver {
+            tile_piece_size: assets.config.tile_piece_size,
+            tile_pieces: &assets.config.tile_sets[0].pieces,
+            stage_layer: &stage_layer,
+        };
+
+        let sprites = slr.resolve(stage.size)
+            .with_context(|| format!("{stage_layer:#?}"))?;
+
+        trace!("sprites: {sprites:#?}");
+
+        Ok(Self {
+            texture,
+            sprites,
+        })
+    }
+}
+
+impl Game {
+    pub fn vertex_data(&self) -> (Vec<Vertex>, Vec<u16>) {
+        let mut vertex_data = Vec::with_capacity(self.sprites.len() * 4);
+        let mut index_data = Vec::with_capacity(self.sprites.len() * 6);
+
+        for (i, sprite) in self.sprites.iter().enumerate() {
+            vertex_data.extend_from_slice(&sprite.vertex_data());
+            index_data.extend_from_slice(&sprite.index_data(i as u16 * 4));
+        }
+
+        (vertex_data, index_data)
+    }
 }

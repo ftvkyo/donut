@@ -1,0 +1,134 @@
+tile_piece_size = 16
+
+
+[[stages]]
+name = "debug-01"
+size = 8
+
+[[stages.layers]]
+tile_name = "wall"
+tile_map = """\
+______x_
+xxx_x_xx
+x_____x_
+____x__x
+xx_xxxx_
+___xx_x_
+xx_x__x_
+xx_xxxx_
+"""
+
+
+[[tile_sets]]
+name = "wall"
+
+
+[[tile_sets.pieces]]
+x = 0
+y = 0
+is = [
+    "top",
+    "left",
+]
+
+[[tile_sets.pieces]]
+x = 1
+y = 0
+is = [
+    "top",
+    "right",
+]
+
+[[tile_sets.pieces]]
+x = 0
+y = 1
+is = [
+    "bottom",
+    "left",
+]
+
+[[tile_sets.pieces]]
+x = 1
+y = 1
+is = [
+    "bottom",
+    "right",
+]
+
+
+[[tile_sets.pieces]]
+x = 2
+y = 0
+is = [
+    "inner",
+    "bottom",
+    "right",
+]
+
+[[tile_sets.pieces]]
+x = 3
+y = 0
+is = [
+    "inner",
+    "bottom",
+    "left",
+]
+
+[[tile_sets.pieces]]
+x = 2
+y = 1
+is = [
+    "inner",
+    "top",
+    "right",
+]
+
+[[tile_sets.pieces]]
+x = 3
+y = 1
+is = [
+    "inner",
+    "top",
+    "left",
+]
+
+
+[[tile_sets.pieces]]
+x = 0
+y = 2
+is = [ "right" ]
+
+[[tile_sets.pieces]]
+x = 1
+y = 2
+is = [ "bottom" ]
+
+[[tile_sets.pieces]]
+x = 0
+y = 3
+is = [ "top" ]
+
+[[tile_sets.pieces]]
+x = 1
+y = 3
+is = [ "left" ]
+
+
+[[tile_sets.pieces]]
+x = 2
+y = 2
+
+[[tile_sets.pieces]]
+x = 3
+y = 2
+weight = 0.2
+
+[[tile_sets.pieces]]
+x = 2
+y = 3
+weight = 0.3
+
+[[tile_sets.pieces]]
+x = 3
+y = 3
+weight = 0.1

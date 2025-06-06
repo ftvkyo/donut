@@ -10,10 +10,18 @@ use winit::{
 
 use crate::{game::Game, renderer::Renderer};
 
-#[derive(Default)]
 pub struct App {
     renderer: Option<Renderer>,
     game: Game,
+}
+
+impl App {
+    pub fn new(game: Game) -> Self {
+        Self {
+            renderer: None,
+            game,
+        }
+    }
 }
 
 impl ApplicationHandler for App {

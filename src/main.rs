@@ -2,7 +2,10 @@ use std::error::Error;
 
 use log::{debug, error, info};
 
+use crate::{assets::Assets, game::Game};
+
 mod app;
+mod assets;
 mod game;
 mod renderer;
 
@@ -24,12 +27,15 @@ fn init_logging() {
 fn run() -> Result<(), Box<dyn Error>> {
     use winit::event_loop::{ControlFlow, EventLoop};
 
+    let assets = Assets::load("assets/assets.toml")?;
+    let game = Game::try_from(assets)?;
+
     debug!("Creating event loop...");
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
     debug!("Creating the app...");
-    let mut app = app::App::default();
+    let mut app = app::App::new(game);
 
     debug!("Running the app...");
     event_loop.run_app(&mut app)?;
@@ -42,6 +48,6 @@ fn main() {
 
     match run() {
         Ok(()) => info!("Done."),
-        Err(err) => error!("Encountered a error: {err}"),
+        Err(err) => error!("Encountered an error:\n{err:?}"),
     }
 }
