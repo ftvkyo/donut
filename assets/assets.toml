@@ -10,10 +10,10 @@ tile_name = "wall"
 tile_map = """\
 ______x_
 xxx_x_xx
-x_____x_
+xx____x_
 ____x__x
 xx_xxxx_
-___xx_x_
+_x_xx_x_
 xx_x__x_
 xx_xxxx_
 """

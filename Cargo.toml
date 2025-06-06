@@ -12,6 +12,7 @@ glam = { version = "0.30.3", features = ["bytemuck"] }
 image = { version = "0.25.6", default-features = false, features = ["webp"] }
 log = "0.4.27"
 pollster = "0.4.0"
+rand = { version = "0.9.1", default-features = false, features = ["alloc", "thread_rng"] }
 rgb = { version = "0.8.50", default-features = false, features = ["bytemuck"] }
 serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.22"

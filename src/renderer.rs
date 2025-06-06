@@ -19,11 +19,7 @@ fn generate_matrix(aspect_ratio: f32) -> glam::Mat4 {
 
     let projection =
         glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, aspect_ratio, 1.0, 10.0);
-    let view = glam::Mat4::look_to_rh(
-        camera,
-        glam::Vec3::NEG_Z,
-        glam::Vec3::Y,
-    );
+    let view = glam::Mat4::look_to_rh(camera, glam::Vec3::NEG_Z, glam::Vec3::Y);
 
     projection * view
 }
@@ -45,7 +41,10 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: Arc<Window>, game: &Game /* TODO: only pass what's necessary */) -> Renderer {
+    pub async fn new(
+        window: Arc<Window>,
+        game: &Game, /* TODO: only pass what's necessary */
+    ) -> Renderer {
         let instance = wgpu::Instance::new(&Default::default());
         let adapter = instance
             .request_adapter(&Default::default())
@@ -292,7 +291,12 @@ impl Renderer {
                     view: &texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.5,
+                            g: 0.5,
+                            b: 0.5,
+                            a: 1.0,
+                        }),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

@@ -1,8 +1,12 @@
-use std::error::Error;
+use std::{borrow::Borrow, error::Error};
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use enumset::EnumSet;
 use log::trace;
+use rand::{
+    distr::{Distribution, weighted::WeightedIndex},
+    rng,
+};
 
 use crate::{
     assets::{Assets, Texture, TilePiece, TilePieceDesignation as TPD},
@@ -65,16 +69,15 @@ pub struct StageLayer {
 
 impl StageLayer {
     pub fn new<S: AsRef<str>>(s: S) -> Self {
-        let inner = s.as_ref()
+        let inner = s
+            .as_ref()
             .trim()
             .split('\n')
             .rev()
             .map(|row| row.chars().map(|c| c == 'x').collect())
             .collect();
 
-        Self {
-            inner,
-        }
+        Self { inner }
     }
 
     fn is_filled(&self, x: isize, y: isize) -> bool {
@@ -113,15 +116,24 @@ pub struct StageLayerResolver<'a, 'b> {
 
 impl<'a> StageLayerResolver<'a, '_> {
     fn select_tile_piece(&self, designation: EnumSet<TPD>) -> anyhow::Result<&'a TilePiece> {
-        /* TODO: weighted selection if there are multiple matches */
+        let candidates: Vec<_> = self
+            .tile_pieces
+            .iter()
+            .filter(|tp| tp.is == designation)
+            .collect();
 
-        for tile_piece in self.tile_pieces {
-            if tile_piece.is == designation {
-                return Ok(tile_piece);
-            }
+        if candidates.len() == 0 {
+            bail!("No tile piece with designation {designation:?}");
         }
 
-        bail!("No tile piece with designation {designation:?}");
+        if candidates.len() == 1 {
+            return Ok(candidates[0]);
+        }
+
+        let weights: Vec<f32> = candidates.iter().map(|tp| *tp.weight.borrow()).collect();
+        let distribution = WeightedIndex::new(&weights)?;
+
+        Ok(candidates[distribution.sample(&mut rng())])
     }
 
     pub fn resolve(self, stage_layer_size: usize) -> anyhow::Result<Vec<Sprite>> {
@@ -202,7 +214,7 @@ impl<'a> StageLayerResolver<'a, '_> {
                 }
 
                 if filled_t && filled_r && !filled_tr {
-                    tpds_tr |= TPD::Inner | TPD::Top | TPD::Right ;
+                    tpds_tr |= TPD::Inner | TPD::Top | TPD::Right;
                 }
 
                 if filled_b && filled_r && !filled_br {
@@ -213,22 +225,26 @@ impl<'a> StageLayerResolver<'a, '_> {
                     tpds_bl |= TPD::Inner | TPD::Bottom | TPD::Left;
                 }
 
-                let tp_tl = self.select_tile_piece(tpds_tl)
+                let tp_tl = self
+                    .select_tile_piece(tpds_tl)
                     .with_context(|| format!("top-left quarter of tile at x={x} y={y}"))?;
 
                 sprites.push(sprite(x, y + h, tp_tl.x, tp_tl.y));
 
-                let tp_tr = self.select_tile_piece(tpds_tr)
+                let tp_tr = self
+                    .select_tile_piece(tpds_tr)
                     .with_context(|| format!("top-right quarter of tile at x={x} y={y}"))?;
 
                 sprites.push(sprite(x + w, y + h, tp_tr.x, tp_tr.y));
 
-                let tp_br = self.select_tile_piece(tpds_br)
+                let tp_br = self
+                    .select_tile_piece(tpds_br)
                     .with_context(|| format!("bottom-right quarter of tile at x={x} y={y}"))?;
 
                 sprites.push(sprite(x + w, y, tp_br.x, tp_br.y));
 
-                let tp_bl = self.select_tile_piece(tpds_bl)
+                let tp_bl = self
+                    .select_tile_piece(tpds_bl)
                     .with_context(|| format!("bottom-left quarter of tile at x={x} y={y}"))?;
 
                 sprites.push(sprite(x, y, tp_bl.x, tp_bl.y));
@@ -275,15 +291,13 @@ impl TryFrom<Assets> for Game {
             stage_layer: &stage_layer,
         };
 
-        let sprites = slr.resolve(stage.size)
+        let sprites = slr
+            .resolve(stage.size)
             .with_context(|| format!("{stage_layer:#?}"))?;
 
         trace!("sprites: {sprites:#?}");
 
-        Ok(Self {
-            texture,
-            sprites,
-        })
+        Ok(Self { texture, sprites })
     }
 }
 
