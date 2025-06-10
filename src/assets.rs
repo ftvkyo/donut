@@ -1,9 +1,15 @@
 use std::{borrow::Borrow, error::Error, path::Path};
 
+use anyhow::Context;
 use enumset::{EnumSet, EnumSetType};
 use image::{ImageBuffer, ImageReader, Rgba};
-use log::debug;
+use log::{debug, trace};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    game::{Game, Movement},
+    sprite::StageLayerResolver,
+};
 
 pub type Texture = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
@@ -105,6 +111,51 @@ impl Assets {
         Ok(Self {
             config,
             tile_sets_textures,
+        })
+    }
+}
+
+impl TryFrom<Assets> for Game {
+    type Error = Box<dyn Error>;
+
+    fn try_from(assets: Assets) -> Result<Self, Self::Error> {
+        let texture = assets
+            .tile_sets_textures
+            .into_iter()
+            .next()
+            .ok_or("zero tile set textures loaded?")?;
+
+        let stage = assets
+            .config
+            .stages
+            .into_iter()
+            .next()
+            .ok_or("zero stages declared?")?;
+
+        let layer = stage
+            .layers
+            .into_iter()
+            .next()
+            .ok_or("zero stage layers declared?")?;
+
+        let stage_layer = crate::sprite::StageLayer::new(layer.tile_map);
+
+        let slr = StageLayerResolver {
+            tile_piece_size: assets.config.tile_piece_size,
+            tile_pieces: &assets.config.tile_sets[0].pieces,
+            stage_layer: &stage_layer,
+        };
+
+        let sprites = slr
+            .resolve(stage.size)
+            .with_context(|| format!("{stage_layer:#?}"))?;
+
+        trace!("sprites: {sprites:#?}");
+
+        Ok(Self {
+            texture,
+            sprites,
+            movement: Movement::new_at(glam::vec2(4.0, 4.0)),
         })
     }
 }

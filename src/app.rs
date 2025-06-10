@@ -3,7 +3,7 @@ use std::sync::Arc;
 use log::info;
 use winit::{
     application::ApplicationHandler,
-    event::{ElementState, KeyEvent, WindowEvent},
+    event::WindowEvent,
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
@@ -47,12 +47,12 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         let renderer = self.renderer.as_mut().unwrap();
-        let mut moved = false;
 
         match event {
             WindowEvent::CloseRequested => {
                 info!("Received close request, stopping...");
                 event_loop.exit();
+                return;
             }
             WindowEvent::RedrawRequested => {
                 renderer.render(&self.game);
@@ -60,41 +60,29 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(size) => {
                 renderer.resize(size);
-                renderer.update_camera(self.game.position);
+                renderer.update_camera(self.game.movement.get_position());
                 // No need to re-render as the next event will be RedrawRequested
             }
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key,
-                        state: ElementState::Pressed,
-                        ..
-                    },
-                ..
-            } => match physical_key {
+            WindowEvent::KeyboardInput { event, .. } => match event.physical_key {
                 PhysicalKey::Code(KeyCode::ArrowUp) => {
-                    self.game.position += glam::vec2(0.0, 1.0);
-                    moved = true;
+                    self.game.movement.accel_u = event.state.is_pressed();
                 }
                 PhysicalKey::Code(KeyCode::ArrowRight) => {
-                    self.game.position += glam::vec2(1.0, 0.0);
-                    moved = true;
+                    self.game.movement.accel_r = event.state.is_pressed();
                 }
                 PhysicalKey::Code(KeyCode::ArrowDown) => {
-                    self.game.position += glam::vec2(0.0, -1.0);
-                    moved = true;
+                    self.game.movement.accel_d = event.state.is_pressed();
                 }
                 PhysicalKey::Code(KeyCode::ArrowLeft) => {
-                    self.game.position += glam::vec2(-1.0, 0.0);
-                    moved = true;
+                    self.game.movement.accel_l = event.state.is_pressed();
                 }
                 _ => (),
             },
             _ => (),
         }
 
-        if moved {
-            renderer.update_camera(self.game.position);
-        }
+        // TODO: make sure this is called at a reasonable frequency (not too frequently, not too infrequently)
+        self.game.movement.advance();
+        renderer.update_camera(self.game.movement.get_position());
     }
 }
