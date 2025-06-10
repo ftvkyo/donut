@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use anyhow::{Context, bail};
 use enumset::EnumSet;
 use rand::{
@@ -129,7 +127,7 @@ impl<'a> StageLayerResolver<'a, '_> {
             return Ok(candidates[0]);
         }
 
-        let weights: Vec<f32> = candidates.iter().map(|tp| *tp.weight.borrow()).collect();
+        let weights: Vec<f32> = candidates.iter().map(|tp| *tp.weight).collect();
         let distribution = WeightedIndex::new(&weights)?;
 
         Ok(candidates[distribution.sample(&mut rng())])

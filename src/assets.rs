@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, error::Error, path::Path};
+use std::{error::Error, ops::Deref, path::Path};
 
 use anyhow::Context;
 use enumset::{EnumSet, EnumSetType};
@@ -22,8 +22,10 @@ impl Default for TilePieceWeight {
     }
 }
 
-impl Borrow<f32> for TilePieceWeight {
-    fn borrow(&self) -> &f32 {
+impl Deref for TilePieceWeight {
+    type Target = f32;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
