@@ -31,6 +31,7 @@ pub struct Renderer {
     size: winit::dpi::PhysicalSize<u32>,
     surface: wgpu::Surface<'static>,
     surface_format: wgpu::TextureFormat,
+    surface_view_format: wgpu::TextureFormat,
     pipeline: wgpu::RenderPipeline,
 
     bind_group: wgpu::BindGroup,
@@ -61,18 +62,6 @@ impl Renderer {
         });
 
         let size = window.inner_size();
-
-        let surface = instance.create_surface(window.clone()).unwrap();
-        let capabilities = surface.get_capabilities(&adapter);
-
-        let surface_format = capabilities
-            .formats
-            .into_iter()
-            .find(|fmt|
-                fmt.has_color_aspect()
-                && fmt.is_srgb()
-            )
-            .expect("No suitable surface format found");
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -121,6 +110,8 @@ impl Renderer {
             depth_or_array_layers: 1,
         };
 
+        let texture_view_format = wgpu::TextureFormat::Rgba8Unorm;
+
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size: texture_extent,
@@ -129,7 +120,7 @@ impl Renderer {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
+            view_formats: &[texture_view_format],
         });
 
         queue.write_texture(
@@ -143,7 +134,10 @@ impl Renderer {
             texture_extent,
         );
 
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(texture_view_format),
+            ..Default::default()
+        });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -191,6 +185,20 @@ impl Renderer {
             ],
         }];
 
+        let surface = instance.create_surface(window.clone()).unwrap();
+        let capabilities = surface.get_capabilities(&adapter);
+
+        let surface_format = capabilities
+            .formats
+            .into_iter()
+            .find(|fmt|
+                fmt.has_color_aspect()
+                && fmt.is_srgb()
+            )
+            .expect("No suitable surface format found");
+
+        let surface_view_format = surface_format.remove_srgb_suffix();
+
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
@@ -204,7 +212,7 @@ impl Renderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
-                targets: &[Some(surface_format.into())],
+                targets: &[Some(surface_view_format.into())],
             }),
             primitive: wgpu::PrimitiveState {
                 cull_mode: Some(wgpu::Face::Back),
@@ -223,6 +231,7 @@ impl Renderer {
             size,
             surface,
             surface_format,
+            surface_view_format,
             pipeline,
 
             bind_group,
@@ -242,13 +251,10 @@ impl Renderer {
     }
 
     fn configure_surface(&self) {
-        // Request compatibility with the sRGB-format texture view we're going to create later.
-        let view_formats = vec![self.surface_format.add_srgb_suffix()];
-
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: self.surface_format,
-            view_formats,
+            view_formats: vec![self.surface_view_format],
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             width: self.size.width,
             height: self.size.height,
@@ -278,11 +284,10 @@ impl Renderer {
             .get_current_texture()
             .expect("failed to acquire next swapchain texture");
 
-        let texture_view = surface_texture
+        let surface_view = surface_texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor {
-                // Without add_srgb_suffix() the image we will be working with might not be "gamma correct".
-                format: Some(self.surface_format.add_srgb_suffix()),
+                format: Some(self.surface_view_format),
                 ..Default::default()
             });
 
@@ -292,7 +297,7 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &texture_view,
+                    view: &surface_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
