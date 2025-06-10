@@ -65,10 +65,14 @@ impl Renderer {
         let surface = instance.create_surface(window.clone()).unwrap();
         let capabilities = surface.get_capabilities(&adapter);
 
-        let surface_format = *capabilities
+        let surface_format = capabilities
             .formats
-            .get(0)
-            .expect("No supported surface formats");
+            .into_iter()
+            .find(|fmt|
+                fmt.has_color_aspect()
+                && fmt.is_srgb()
+            )
+            .expect("No suitable surface format found");
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -88,7 +92,7 @@ impl Renderer {
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
-                        sample_type: wgpu::TextureSampleType::Uint,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         view_dimension: wgpu::TextureViewDimension::D2,
                     },
                     count: None,
@@ -123,7 +127,7 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Uint,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });

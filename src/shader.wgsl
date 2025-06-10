@@ -9,7 +9,7 @@ var<uniform> transform: mat4x4<f32>;
 
 @group(0)
 @binding(1)
-var texture: texture_2d<u32>;
+var texture: texture_2d<f32>;
 
 @vertex
 fn vs_main(
@@ -26,9 +26,9 @@ fn vs_main(
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
     let tex = textureLoad(texture, vec2<i32>(vertex.tex_coord), 0);
 
-    if tex.a == 0 {
+    if tex.a == 0.0 {
         discard;
     }
 
-    return vec4<f32>(tex) / 255.0;
+    return vec4<f32>(tex);
 }
