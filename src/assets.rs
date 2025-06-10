@@ -76,7 +76,9 @@ pub struct Assets {
 
 impl Assets {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
-        let config = std::fs::read(path)?;
+        debug!("Loading {}...", path.as_ref().to_string_lossy());
+
+        let config = std::fs::read(&path)?;
         let config = String::from_utf8(config)?;
         let config: AssetsConfig = toml::from_str(&config)?;
 
@@ -84,8 +86,14 @@ impl Assets {
             .tile_sets
             .iter()
             .map(|tset| {
-                let tset_texture = format!("assets/textures/{}.webp", tset.name);
-                debug!("Loading {tset_texture}...");
+                let tset_texture = path
+                    .as_ref()
+                    .parent()
+                    .unwrap()
+                    .join(format!("textures/{}.webp", tset.name));
+
+                debug!("Loading {}...", tset_texture.to_string_lossy());
+
                 ImageReader::open(tset_texture)
                     .unwrap()
                     .decode()
