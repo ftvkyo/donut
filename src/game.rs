@@ -2,7 +2,10 @@ use std::time::Instant;
 
 use glam::{Vec2, vec2};
 
-use crate::{assets::Texture, renderer::Vertex, sprite::Sprite};
+use crate::{
+    assets::{Sprite, Texture},
+    renderer::Vertex,
+};
 
 pub struct Movement {
     position: Vec2,

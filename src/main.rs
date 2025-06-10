@@ -9,7 +9,6 @@ mod assets;
 mod config;
 mod game;
 mod renderer;
-mod sprite;
 
 fn init_logging() {
     use log::LevelFilter;
