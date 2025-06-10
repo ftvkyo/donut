@@ -57,13 +57,13 @@ pub struct TileSet {
 
 #[derive(Deserialize)]
 pub struct StageLayer {
-    pub tile_name: String,
+    // pub tile_name: String,
     pub tile_map: String,
 }
 
 #[derive(Deserialize)]
 pub struct StageConfig {
-    pub name: String,
+    // pub name: String,
     pub size: usize,
     pub layers: Vec<StageLayer>,
 }
