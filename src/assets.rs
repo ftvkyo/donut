@@ -15,11 +15,11 @@ use crate::{
     renderer::Vertex,
 };
 
-pub type Texture = ImageBuffer<Rgba<u8>, Vec<u8>>;
+pub type TextureData = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
 pub struct Assets {
     pub config: Config,
-    pub tile_sets_textures: Vec<Texture>,
+    pub tile_sets_textures: Vec<TextureData>,
 }
 
 impl Assets {

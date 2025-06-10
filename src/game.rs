@@ -3,7 +3,7 @@ use std::time::Instant;
 use glam::{Vec2, vec2};
 
 use crate::{
-    assets::{Sprite, Texture},
+    assets::{Sprite, TextureData},
     renderer::Vertex,
 };
 
@@ -68,7 +68,7 @@ impl Movement {
 }
 
 pub struct Game {
-    pub texture: Texture,
+    pub texture: TextureData,
     pub sprites: Vec<Sprite>,
     pub movement: Movement,
 }

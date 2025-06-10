@@ -14,25 +14,36 @@ pub struct Vertex {
     pub tex_coord: [f32; 2],
 }
 
+struct Surface {
+    pub inner: wgpu::Surface<'static>,
+    pub format: wgpu::TextureFormat,
+    pub view_format: wgpu::TextureFormat,
+}
+
+struct Camera {
+    pub bind_group_layout: wgpu::BindGroupLayout,
+    pub bind_group: wgpu::BindGroup,
+    pub view_uniform: wgpu::Buffer,
+    pub proj_uniform: wgpu::Buffer,
+}
+
+struct Vertices {
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    index_count: usize,
+}
+
 pub struct Renderer {
     window: Arc<Window>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    size: winit::dpi::PhysicalSize<u32>,
-    surface: wgpu::Surface<'static>,
-    surface_format: wgpu::TextureFormat,
-    surface_view_format: wgpu::TextureFormat,
+    surface: Surface,
     pipeline: wgpu::RenderPipeline,
 
     texture_bind_group: wgpu::BindGroup,
 
-    camera_bind_group: wgpu::BindGroup,
-    camera_view_uniform: wgpu::Buffer,
-    camera_proj_uniform: wgpu::Buffer,
-
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    index_count: usize,
+    camera: Camera,
+    vertices: Vertices,
 }
 
 impl Renderer {
@@ -57,57 +68,66 @@ impl Renderer {
 
         /* Set up the camera stuff */
 
-        let camera_uniform_type = wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: wgpu::BufferSize::new(size_of::<glam::Mat4>() as u64),
-        };
+        let camera = {
+            let uniform_type = wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: wgpu::BufferSize::new(size_of::<glam::Mat4>() as u64),
+            };
 
-        let camera_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Camera BGL"),
+            let bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Camera BGL"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: uniform_type,
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: uniform_type,
+                            count: None,
+                        },
+                    ],
+                });
+
+            let view_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Camera View Uniform"),
+                contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+            let proj_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Projection Uniform"),
+                contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Camera BG"),
+                layout: &bind_group_layout,
                 entries: &[
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: camera_uniform_type,
-                        count: None,
+                        resource: view_uniform.as_entire_binding(),
                     },
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupEntry {
                         binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: camera_uniform_type,
-                        count: None,
+                        resource: proj_uniform.as_entire_binding(),
                     },
                 ],
             });
 
-        let camera_view_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera View Uniform"),
-            contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let camera_proj_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Projection Uniform"),
-            contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Camera BG"),
-            layout: &camera_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_view_uniform.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: camera_proj_uniform.as_entire_binding(),
-                },
-            ],
-        });
+            Camera {
+                bind_group_layout,
+                bind_group,
+                view_uniform,
+                proj_uniform,
+            }
+        };
 
         /* Set up the texture stuff */
 
@@ -174,19 +194,27 @@ impl Renderer {
 
         /* Set up the pipeline */
 
-        let (vertex_data, index_data) = game.vertex_data();
+        let vertices = {
+            let (vertex_data, index_data) = game.vertex_data();
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertex_data),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertex_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&index_data),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+            let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(&index_data),
+                usage: wgpu::BufferUsages::INDEX,
+            });
+
+            Vertices {
+                vertex_buffer,
+                index_buffer,
+                index_count: index_data.len(),
+            }
+        };
 
         let vertex_buffers = [wgpu::VertexBufferLayout {
             array_stride: size_of::<Vertex>() as wgpu::BufferAddress,
@@ -205,20 +233,28 @@ impl Renderer {
             ],
         }];
 
-        let surface = instance.create_surface(window.clone()).unwrap();
-        let capabilities = surface.get_capabilities(&adapter);
+        let surface = {
+            let surface = instance.create_surface(window.clone()).unwrap();
+            let capabilities = surface.get_capabilities(&adapter);
 
-        let surface_format = capabilities
-            .formats
-            .into_iter()
-            .find(|fmt| fmt.has_color_aspect() && fmt.is_srgb())
-            .expect("No suitable surface format found");
+            let format = capabilities
+                .formats
+                .into_iter()
+                .find(|fmt| fmt.has_color_aspect() && fmt.is_srgb())
+                .expect("No suitable surface format found");
 
-        let surface_view_format = surface_format.remove_srgb_suffix();
+            let view_format = format.remove_srgb_suffix();
+
+            Surface {
+                inner: surface,
+                format,
+                view_format,
+            }
+        };
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&camera_bind_group_layout, &texture_bind_group_layout],
+            bind_group_layouts: &[&camera.bind_group_layout, &texture_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -235,7 +271,7 @@ impl Renderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
-                targets: &[Some(surface_view_format.into())],
+                targets: &[Some(surface.view_format.into())],
             }),
             primitive: wgpu::PrimitiveState {
                 cull_mode: Some(wgpu::Face::Back),
@@ -247,27 +283,17 @@ impl Renderer {
             cache: None,
         });
 
-        let size = window.inner_size();
-
         let mut state = Renderer {
             window,
             device,
             queue,
-            size,
             surface,
-            surface_format,
-            surface_view_format,
             pipeline,
-
-            camera_bind_group,
-            camera_view_uniform,
-            camera_proj_uniform,
 
             texture_bind_group,
 
-            vertex_buffer,
-            index_buffer,
-            index_count: index_data.len(),
+            camera,
+            vertices,
         };
 
         state.configure_surface();
@@ -280,25 +306,29 @@ impl Renderer {
         &self.window
     }
 
-    fn configure_surface(&self) {
+    pub fn configure_surface(&self) {
+        let size = self.window.inner_size();
+
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: self.surface_format,
-            view_formats: vec![self.surface_view_format],
+            format: self.surface.format,
+            view_formats: vec![self.surface.view_format],
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            width: self.size.width,
-            height: self.size.height,
+            width: size.width,
+            height: size.height,
             desired_maximum_frame_latency: 2,
             present_mode: wgpu::PresentMode::AutoVsync,
         };
 
-        self.surface.configure(&self.device, &surface_config);
+        self.surface.inner.configure(&self.device, &surface_config);
     }
 
     pub fn update_camera(&mut self, position: glam::Vec2) {
         use glam::{Mat4, Vec3};
 
-        let aspect_ratio = self.size.width as f32 / self.size.height as f32;
+        let size = self.window.inner_size();
+
+        let aspect_ratio = size.width as f32 / size.height as f32;
 
         let camera_fov = std::f32::consts::FRAC_PI_2;
         let camera_dist = 4.0; // with PI/2, this means we see 4 tiles up and 4 tiles down
@@ -308,27 +338,23 @@ impl Renderer {
         let proj = Mat4::perspective_rh(camera_fov, aspect_ratio, 1.0, 10.0);
 
         self.queue
-            .write_buffer(&self.camera_view_uniform, 0, bytemuck::cast_slice(&[view]));
+            .write_buffer(&self.camera.view_uniform, 0, bytemuck::cast_slice(&[view]));
 
         self.queue
-            .write_buffer(&self.camera_proj_uniform, 0, bytemuck::cast_slice(&[proj]));
-    }
-
-    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
-        self.size = size;
-        self.configure_surface();
+            .write_buffer(&self.camera.proj_uniform, 0, bytemuck::cast_slice(&[proj]));
     }
 
     pub fn render(&mut self, _game: &Game) {
         let surface_texture = self
             .surface
+            .inner
             .get_current_texture()
             .expect("failed to acquire next swapchain texture");
 
         let surface_view = surface_texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor {
-                format: Some(self.surface_view_format),
+                format: Some(self.surface.view_format),
                 ..Default::default()
             });
 
@@ -357,14 +383,17 @@ impl Renderer {
 
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.camera_bind_group, &[]);
+            rpass.set_bind_group(0, &self.camera.bind_group, &[]);
             rpass.set_bind_group(1, &self.texture_bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            rpass.set_vertex_buffer(0, self.vertices.vertex_buffer.slice(..));
+            rpass.set_index_buffer(
+                self.vertices.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint16,
+            );
             rpass.pop_debug_group();
 
             rpass.insert_debug_marker("Draw!");
-            rpass.draw_indexed(0..self.index_count as u32, 0, 0..1);
+            rpass.draw_indexed(0..self.vertices.index_count as u32, 0, 0..1);
         }
 
         self.queue.submit([encoder.finish()]);

@@ -58,8 +58,8 @@ impl ApplicationHandler for App {
                 renderer.render(&self.game);
                 renderer.get_window().request_redraw();
             }
-            WindowEvent::Resized(size) => {
-                renderer.resize(size);
+            WindowEvent::Resized(_) => {
+                renderer.configure_surface();
                 renderer.update_camera(self.game.movement.get_position());
                 // No need to re-render as the next event will be RedrawRequested
             }
