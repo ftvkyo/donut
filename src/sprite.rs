@@ -6,7 +6,7 @@ use rand::{
 };
 
 use crate::{
-    assets::{TilePiece, TilePieceDesignation as TPD},
+    config::{TilePiece, TilePieceDesignation as TPD},
     renderer::Vertex,
 };
 

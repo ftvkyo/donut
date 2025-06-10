@@ -6,6 +6,7 @@ use crate::{assets::Assets, game::Game};
 
 mod app;
 mod assets;
+mod config;
 mod game;
 mod renderer;
 mod sprite;
@@ -28,7 +29,7 @@ fn init_logging() {
 fn run() -> Result<(), Box<dyn Error>> {
     use winit::event_loop::{ControlFlow, EventLoop};
 
-    let assets = Assets::load("assets/assets.toml")?;
+    let assets = Assets::load("assets/config.toml")?;
     let game = Game::try_from(assets)?;
 
     debug!("Creating event loop...");
