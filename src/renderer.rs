@@ -24,13 +24,15 @@ pub struct Renderer {
     surface_view_format: wgpu::TextureFormat,
     pipeline: wgpu::RenderPipeline,
 
-    bind_group: wgpu::BindGroup,
-    uniform_buffer: wgpu::Buffer,
+    texture_bind_group: wgpu::BindGroup,
+
+    camera_bind_group: wgpu::BindGroup,
+    camera_view_uniform: wgpu::Buffer,
+    camera_proj_uniform: wgpu::Buffer,
+
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_count: usize,
-
-    camera_position: glam::Vec2,
 }
 
 impl Renderer {
@@ -53,45 +55,61 @@ impl Renderer {
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
         });
 
-        let size = window.inner_size();
+        /* Set up the camera stuff */
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
+        let camera_uniform_type = wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: wgpu::BufferSize::new(size_of::<glam::Mat4>() as u64),
+        };
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Camera BGL"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: camera_uniform_type,
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: camera_uniform_type,
+                        count: None,
+                    },
+                ],
+            });
+
+        let camera_view_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera View Uniform"),
+            contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let camera_proj_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera Projection Uniform"),
+            contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Camera BG"),
+            layout: &camera_bind_group_layout,
             entries: &[
-                wgpu::BindGroupLayoutEntry {
+                wgpu::BindGroupEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new(size_of::<glam::Mat4>() as u64),
-                    },
-                    count: None,
+                    resource: camera_view_uniform.as_entire_binding(),
                 },
-                wgpu::BindGroupLayoutEntry {
+                wgpu::BindGroupEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                    },
-                    count: None,
+                    resource: camera_proj_uniform.as_entire_binding(),
                 },
             ],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Uniform Buffer"),
-            contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        /* Set up the texture stuff */
 
         let texture_bytes_per_row = game.texture.width() * size_of::<Rgba<u8>>() as u32;
 
@@ -130,20 +148,31 @@ impl Renderer {
             ..Default::default()
         });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Texture BGL"),
+                entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-            ],
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                }],
+            });
+
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &texture_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            }],
         });
+
+        /* Set up the pipeline */
 
         let (vertex_data, index_data) = game.vertex_data();
 
@@ -187,6 +216,12 @@ impl Renderer {
 
         let surface_view_format = surface_format.remove_srgb_suffix();
 
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&camera_bind_group_layout, &texture_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
@@ -212,6 +247,8 @@ impl Renderer {
             cache: None,
         });
 
+        let size = window.inner_size();
+
         let mut state = Renderer {
             window,
             device,
@@ -222,17 +259,19 @@ impl Renderer {
             surface_view_format,
             pipeline,
 
-            bind_group,
-            uniform_buffer,
+            camera_bind_group,
+            camera_view_uniform,
+            camera_proj_uniform,
+
+            texture_bind_group,
+
             vertex_buffer,
             index_buffer,
             index_count: index_data.len(),
-
-            camera_position: glam::vec2(4.0, 4.0),
         };
 
         state.configure_surface();
-        state.configure_camera();
+        state.update_camera(glam::vec2(4.0, 4.0));
 
         state
     }
@@ -256,36 +295,28 @@ impl Renderer {
         self.surface.configure(&self.device, &surface_config);
     }
 
-    pub fn configure_camera(&mut self) {
+    pub fn update_camera(&mut self, position: glam::Vec2) {
         use glam::{Mat4, Vec3};
 
         let aspect_ratio = self.size.width as f32 / self.size.height as f32;
 
         let camera_fov = std::f32::consts::FRAC_PI_2;
         let camera_dist = 4.0; // with PI/2, this means we see 4 tiles up and 4 tiles down
-        let camera_pos = self.camera_position.extend(camera_dist);
+        let camera_pos = position.extend(camera_dist);
 
-        let proj = Mat4::perspective_rh(camera_fov, aspect_ratio, 1.0, 10.0);
         let view = Mat4::look_to_rh(camera_pos, Vec3::NEG_Z, Vec3::Y);
+        let proj = Mat4::perspective_rh(camera_fov, aspect_ratio, 1.0, 10.0);
 
-        let matrix = proj * view;
+        self.queue
+            .write_buffer(&self.camera_view_uniform, 0, bytemuck::cast_slice(&[view]));
 
-        self.queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice(matrix.as_ref()),
-        );
-    }
-
-    pub fn move_camera(&mut self, delta: glam::Vec2) {
-        self.camera_position += delta;
-        self.configure_camera();
+        self.queue
+            .write_buffer(&self.camera_proj_uniform, 0, bytemuck::cast_slice(&[proj]));
     }
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
         self.size = size;
         self.configure_surface();
-        self.configure_camera();
     }
 
     pub fn render(&mut self, _game: &Game) {
@@ -326,7 +357,8 @@ impl Renderer {
 
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.bind_group, &[]);
+            rpass.set_bind_group(0, &self.camera_bind_group, &[]);
+            rpass.set_bind_group(1, &self.texture_bind_group, &[]);
             rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             rpass.pop_debug_group();

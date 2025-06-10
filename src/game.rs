@@ -258,6 +258,7 @@ impl<'a> StageLayerResolver<'a, '_> {
 pub struct Game {
     pub texture: Texture,
     pub sprites: Vec<Sprite>,
+    pub position: glam::Vec2,
 }
 
 impl TryFrom<Assets> for Game {
@@ -297,7 +298,11 @@ impl TryFrom<Assets> for Game {
 
         trace!("sprites: {sprites:#?}");
 
-        Ok(Self { texture, sprites })
+        Ok(Self {
+            texture,
+            sprites,
+            position: glam::vec2(4.0, 4.0),
+        })
     }
 }
 

@@ -47,6 +47,8 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         let renderer = self.renderer.as_mut().unwrap();
+        let mut moved = false;
+
         match event {
             WindowEvent::CloseRequested => {
                 info!("Received close request, stopping...");
@@ -58,6 +60,7 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(size) => {
                 renderer.resize(size);
+                renderer.update_camera(self.game.position);
                 // No need to re-render as the next event will be RedrawRequested
             }
             WindowEvent::KeyboardInput {
@@ -69,19 +72,29 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => match physical_key {
-                PhysicalKey::Code(KeyCode::ArrowUp) => renderer.move_camera(glam::vec2(0.0, 1.0)),
+                PhysicalKey::Code(KeyCode::ArrowUp) => {
+                    self.game.position += glam::vec2(0.0, 1.0);
+                    moved = true;
+                }
                 PhysicalKey::Code(KeyCode::ArrowRight) => {
-                    renderer.move_camera(glam::vec2(1.0, 0.0))
+                    self.game.position += glam::vec2(1.0, 0.0);
+                    moved = true;
                 }
                 PhysicalKey::Code(KeyCode::ArrowDown) => {
-                    renderer.move_camera(glam::vec2(0.0, -1.0))
+                    self.game.position += glam::vec2(0.0, -1.0);
+                    moved = true;
                 }
                 PhysicalKey::Code(KeyCode::ArrowLeft) => {
-                    renderer.move_camera(glam::vec2(-1.0, 0.0))
+                    self.game.position += glam::vec2(-1.0, 0.0);
+                    moved = true;
                 }
                 _ => (),
             },
             _ => (),
+        }
+
+        if moved {
+            renderer.update_camera(self.game.position);
         }
     }
 }
