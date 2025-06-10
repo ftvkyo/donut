@@ -14,16 +14,6 @@ pub struct Vertex {
     pub tex_coord: [f32; 2],
 }
 
-fn generate_matrix(aspect_ratio: f32) -> glam::Mat4 {
-    let camera = glam::Vec3::new(4.0, 4.0, 4.0);
-
-    let projection =
-        glam::Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, aspect_ratio, 1.0, 10.0);
-    let view = glam::Mat4::look_to_rh(camera, glam::Vec3::NEG_Z, glam::Vec3::Y);
-
-    projection * view
-}
-
 pub struct Renderer {
     window: Arc<Window>,
     device: wgpu::Device,
@@ -39,6 +29,8 @@ pub struct Renderer {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_count: usize,
+
+    camera_position: glam::Vec2,
 }
 
 impl Renderer {
@@ -95,10 +87,9 @@ impl Renderer {
             push_constant_ranges: &[],
         });
 
-        let matrix = generate_matrix(size.width as f32 / size.height as f32);
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Uniform Buffer"),
-            contents: bytemuck::cast_slice(matrix.as_ref()),
+            contents: bytemuck::cast_slice(glam::Mat4::ZERO.as_ref()),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -191,10 +182,7 @@ impl Renderer {
         let surface_format = capabilities
             .formats
             .into_iter()
-            .find(|fmt|
-                fmt.has_color_aspect()
-                && fmt.is_srgb()
-            )
+            .find(|fmt| fmt.has_color_aspect() && fmt.is_srgb())
             .expect("No suitable surface format found");
 
         let surface_view_format = surface_format.remove_srgb_suffix();
@@ -224,7 +212,7 @@ impl Renderer {
             cache: None,
         });
 
-        let state = Renderer {
+        let mut state = Renderer {
             window,
             device,
             queue,
@@ -239,9 +227,12 @@ impl Renderer {
             vertex_buffer,
             index_buffer,
             index_count: index_data.len(),
+
+            camera_position: glam::vec2(4.0, 4.0),
         };
 
         state.configure_surface();
+        state.configure_camera();
 
         state
     }
@@ -265,17 +256,36 @@ impl Renderer {
         self.surface.configure(&self.device, &surface_config);
     }
 
-    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
-        let matrix = generate_matrix(size.width as f32 / size.height as f32);
+    pub fn configure_camera(&mut self) {
+        use glam::{Mat4, Vec3};
 
-        self.size = size;
-        self.configure_surface();
+        let aspect_ratio = self.size.width as f32 / self.size.height as f32;
+
+        let camera_fov = std::f32::consts::FRAC_PI_2;
+        let camera_dist = 4.0; // with PI/2, this means we see 4 tiles up and 4 tiles down
+        let camera_pos = self.camera_position.extend(camera_dist);
+
+        let proj = Mat4::perspective_rh(camera_fov, aspect_ratio, 1.0, 10.0);
+        let view = Mat4::look_to_rh(camera_pos, Vec3::NEG_Z, Vec3::Y);
+
+        let matrix = proj * view;
 
         self.queue.write_buffer(
             &self.uniform_buffer,
             0,
             bytemuck::cast_slice(matrix.as_ref()),
         );
+    }
+
+    pub fn move_camera(&mut self, delta: glam::Vec2) {
+        self.camera_position += delta;
+        self.configure_camera();
+    }
+
+    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        self.size = size;
+        self.configure_surface();
+        self.configure_camera();
     }
 
     pub fn render(&mut self, _game: &Game) {

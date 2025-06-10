@@ -3,8 +3,9 @@ use std::sync::Arc;
 use log::info;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, KeyEvent, WindowEvent},
     event_loop::ActiveEventLoop,
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
@@ -59,6 +60,27 @@ impl ApplicationHandler for App {
                 renderer.resize(size);
                 // No need to re-render as the next event will be RedrawRequested
             }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key,
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => match physical_key {
+                PhysicalKey::Code(KeyCode::ArrowUp) => renderer.move_camera(glam::vec2(0.0, 1.0)),
+                PhysicalKey::Code(KeyCode::ArrowRight) => {
+                    renderer.move_camera(glam::vec2(1.0, 0.0))
+                }
+                PhysicalKey::Code(KeyCode::ArrowDown) => {
+                    renderer.move_camera(glam::vec2(0.0, -1.0))
+                }
+                PhysicalKey::Code(KeyCode::ArrowLeft) => {
+                    renderer.move_camera(glam::vec2(-1.0, 0.0))
+                }
+                _ => (),
+            },
             _ => (),
         }
     }
