@@ -161,7 +161,7 @@ impl View {
             rpass.set_vertex_buffer(0, self.vertex_data.vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.vertex_data.index_buffer.slice(..),
-                wgpu::IndexFormat::Uint16,
+                GPUVertexData::INDEX_FORMAT,
             );
             rpass.pop_debug_group();
 
