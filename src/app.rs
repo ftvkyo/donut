@@ -79,8 +79,9 @@ impl ApplicationHandler for App {
         // TODO: make sure this is called at a reasonable frequency (not too frequently, not too infrequently)
         self.game.movement.advance();
         let position = self.game.movement.get_position();
-        view.update_camera(|camera| {
-            camera.set_position(position);
+
+        view.update_light(|light| {
+            light.position = position;
         });
     }
 }

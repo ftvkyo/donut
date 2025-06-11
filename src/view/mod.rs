@@ -1,19 +1,18 @@
 pub mod camera;
+pub mod light;
 pub mod render_target;
 pub mod texture;
 pub mod vertex;
 
 use std::{borrow::Cow, sync::Arc};
 
+use glam::vec2;
 use winit::window::Window;
 
 use crate::{
     game::Game,
     view::{
-        camera::{Camera, GPUCameraData},
-        render_target::RenderTarget,
-        texture::GPUTextureData,
-        vertex::GPUVertexData,
+        camera::{Camera, GPUCameraData}, light::{GPULightData, Light}, render_target::RenderTarget, texture::GPUTextureData, vertex::GPUVertexData
     },
 };
 
@@ -28,6 +27,8 @@ pub struct View {
 
     camera: Camera,
     camera_data: GPUCameraData,
+    light: Light,
+    light_data: GPULightData,
     texture_data: GPUTextureData,
     vertex_data: GPUVertexData,
 }
@@ -54,11 +55,16 @@ impl View {
 
         let render_target = RenderTarget::new(&instance, &adapter, &device, window);
 
+        /* TODO: extract the logic that initialises camera and light */
+
         let camera = Camera::new(
             render_target.get_aspect_ratio(),
-            game.movement.get_position(),
+            vec2(4.0, 4.0),
         );
         let camera_data = GPUCameraData::new(&device, &camera);
+
+        let light = Light::new(game.movement.get_position());
+        let light_data = GPULightData::new(&device, &light);
 
         let texture_data = GPUTextureData::new(&device, &queue, &game.texture);
 
@@ -71,6 +77,7 @@ impl View {
             label: None,
             bind_group_layouts: &[
                 &camera_data.bind_group_layout,
+                &light_data.bind_group_layout,
                 &texture_data.bind_group_layout,
             ],
             push_constant_ranges: &[],
@@ -110,6 +117,8 @@ impl View {
 
             camera,
             camera_data,
+            light,
+            light_data,
             texture_data,
             vertex_data,
         }
@@ -120,11 +129,16 @@ impl View {
         self.camera_data.update(&self.queue, &self.camera);
     }
 
+    pub fn update_light(&mut self, f: impl Fn(&mut Light)) {
+        f(&mut self.light);
+        self.light_data.update(&self.queue, &self.light);
+    }
+
     pub fn resize(&mut self) {
         self.render_target.configure(&self.device);
         let aspect_ratio = self.render_target.get_aspect_ratio();
         self.update_camera(|camera| {
-            camera.set_aspect_ratio(aspect_ratio);
+            camera.aspect_ratio = aspect_ratio;
         });
     }
 
@@ -157,7 +171,8 @@ impl View {
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.camera_data.bind_group, &[]);
-            rpass.set_bind_group(1, &self.texture_data.bind_group, &[]);
+            rpass.set_bind_group(1, &self.light_data.bind_group, &[]);
+            rpass.set_bind_group(2, &self.texture_data.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.vertex_data.vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.vertex_data.index_buffer.slice(..),

@@ -12,12 +12,14 @@ var<uniform> view: mat4x4<f32>;
 @group(0) @binding(1)
 var<uniform> proj: mat4x4<f32>;
 
+@group(1) @binding(0)
+var<uniform> light_pos: vec4<f32>;
+
 @vertex
 fn vs_main(
     @location(0) position: vec4<f32>,
     @location(1) tex_coord: vec2<f32>,
 ) -> VertexOutput {
-    let light_pos = vec4(4.0, 4.0, 1.0, 1.0);
     let normal = vec3(0.0, 0.0, 1.0);
 
     var result: VertexOutput;
@@ -30,7 +32,7 @@ fn vs_main(
     return result;
 }
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var texture: texture_2d<f32>;
 
 @fragment
@@ -42,10 +44,10 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
 
     let light_ambient = 0.1;
 
-    let light_diffuse_strength = 0.6;
+    let light_diffuse_strength = 0.75;
     let light_diffuse = max(dot(vertex.frag_norm, light_dir), 0.0);
 
-    let light_specular_strength = 0.6;
+    let light_specular_strength = 0.75;
     let light_specular = pow(max(dot(view_dir, reflect(-light_dir, vertex.frag_norm)), 0.0), 32);
 
     let tex = textureLoad(texture, vec2<i32>(vertex.tex_coord), 0);

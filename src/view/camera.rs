@@ -2,8 +2,8 @@ use glam::{Mat4, Vec2, Vec3};
 use wgpu::util::DeviceExt;
 
 pub struct Camera {
-    aspect_ratio: f32,
-    position: Vec2,
+    pub aspect_ratio: f32,
+    pub position: Vec2,
 }
 
 impl Camera {
@@ -17,14 +17,6 @@ impl Camera {
             aspect_ratio,
             position,
         }
-    }
-
-    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
-        self.aspect_ratio = aspect_ratio;
-    }
-
-    pub fn set_position(&mut self, position: Vec2) {
-        self.position = position;
     }
 
     pub fn matrix_view(&self) -> Mat4 {
@@ -52,7 +44,7 @@ impl GPUCameraData {
         let uniform_type = wgpu::BindingType::Buffer {
             ty: wgpu::BufferBindingType::Uniform,
             has_dynamic_offset: false,
-            min_binding_size: wgpu::BufferSize::new(size_of::<glam::Mat4>() as u64),
+            min_binding_size: wgpu::BufferSize::new(size_of::<Mat4>() as u64),
         };
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
