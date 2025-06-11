@@ -12,7 +12,11 @@ use winit::window::Window;
 use crate::{
     game::Game,
     view::{
-        camera::{Camera, GPUCameraData}, light::{GPULightData, Light}, render_target::RenderTarget, texture::GPUTextureData, vertex::GPUVertexData
+        camera::{Camera, GPUCameraData},
+        light::{GPULightData, Light},
+        render_target::RenderTarget,
+        texture::GPUTextureData,
+        vertex::GPUVertexData,
     },
 };
 
@@ -57,16 +61,14 @@ impl View {
 
         /* TODO: extract the logic that initialises camera and light */
 
-        let camera = Camera::new(
-            render_target.get_aspect_ratio(),
-            vec2(4.0, 4.0),
-        );
+        let camera = Camera::new(render_target.get_aspect_ratio(), vec2(4.0, 4.0));
         let camera_data = GPUCameraData::new(&device, &camera);
 
         let light = Light::new(game.movement.get_position());
         let light_data = GPULightData::new(&device, &light);
 
-        let texture_data = GPUTextureData::new(&device, &queue, &game.texture);
+        let texture_data =
+            GPUTextureData::new(&device, &queue, &game.texture_color, &game.texture_normal);
 
         let (vertex_data, index_data) = game.vertex_data();
         let vertex_data = GPUVertexData::new(&device, vertex_data, index_data);
@@ -154,12 +156,7 @@ impl View {
                     view: &surface_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.5,
-                            g: 0.5,
-                            b: 0.5,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

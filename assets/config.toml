@@ -12,14 +12,14 @@ size = 8
 [[stages.layers]]
 tile_name = "wall"
 tile_map = """\
-______x_
-xxx_x_xx
-xx____x_
-____x__x
-xx_xxxx_
-_x_xx_x_
-xx_x__x_
-xx_xxxx_
+__x__x__
+_xx__xx_
+xxxxxxxx
+__xxxx__
+__xxxx__
+xxxxxxxx
+_xx__xx_
+__x__x__
 """
 
 

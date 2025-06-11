@@ -63,12 +63,38 @@ impl Movement {
             self.velocity += dir * Self::ACCEL * time_delta;
         }
 
+        // Clamp speed
+
+        self.velocity.x = self.velocity.x.clamp(-4.0, 4.0);
+        self.velocity.y = self.velocity.y.clamp(-4.0, 4.0);
+
+        // Modify position
+
         self.position += self.velocity * time_delta;
+
+        // Wrap around if out of bounds
+
+        if self.position.x > 8.0 {
+            self.position.x -= 8.0;
+        }
+
+        if self.position.x < 0.0 {
+            self.position.x += 8.0;
+        }
+
+        if self.position.y > 8.0 {
+            self.position.y -= 8.0;
+        }
+
+        if self.position.y < 0.0 {
+            self.position.y += 8.0;
+        }
     }
 }
 
 pub struct Game {
-    pub texture: TextureData,
+    pub texture_color: TextureData,
+    pub texture_normal: TextureData,
     pub sprites: Vec<Sprite>,
     pub movement: Movement,
     pub shader: String,

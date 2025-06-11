@@ -20,7 +20,8 @@ pub type TextureData = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
 pub struct Assets {
     pub config: Config,
-    pub tile_sets_textures: Vec<TextureData>,
+    pub tile_set_colors: Vec<TextureData>,
+    pub tile_set_normals: Vec<TextureData>,
     pub shader_sources: Vec<String>,
 }
 
@@ -34,15 +35,31 @@ impl Assets {
 
         let parent = path.as_ref().parent().unwrap();
 
-        let tile_sets_textures = config
+        let tile_sets_colors = config
             .tile_sets
             .iter()
-            .map(|tset| {
-                let tset_texture = parent.join(format!("textures/{}.webp", tset.name));
+            .map(|tile_set| {
+                let texture = parent.join(format!("textures/{}.webp", tile_set.name));
 
-                debug!("Loading {}...", tset_texture.to_string_lossy());
+                debug!("Loading {}...", texture.to_string_lossy());
 
-                ImageReader::open(tset_texture)
+                ImageReader::open(texture)
+                    .unwrap()
+                    .decode()
+                    .unwrap()
+                    .into_rgba8()
+            })
+            .collect();
+
+        let tile_sets_normals = config
+            .tile_sets
+            .iter()
+            .map(|tile_set| {
+                let texture = parent.join(format!("textures/{}-normals.webp", tile_set.name));
+
+                debug!("Loading {}...", texture.to_string_lossy());
+
+                ImageReader::open(texture)
                     .unwrap()
                     .decode()
                     .unwrap()
@@ -64,7 +81,8 @@ impl Assets {
 
         Ok(Self {
             config,
-            tile_sets_textures,
+            tile_set_colors: tile_sets_colors,
+            tile_set_normals: tile_sets_normals,
             shader_sources,
         })
     }
@@ -80,8 +98,14 @@ impl TryFrom<Assets> for Game {
             .next()
             .ok_or("zero shaders loaded?")?;
 
-        let texture = assets
-            .tile_sets_textures
+        let texture_color = assets
+            .tile_set_colors
+            .into_iter()
+            .next()
+            .ok_or("zero tile set textures loaded?")?;
+
+        let texture_normal = assets
+            .tile_set_normals
             .into_iter()
             .next()
             .ok_or("zero tile set textures loaded?")?;
@@ -115,7 +139,8 @@ impl TryFrom<Assets> for Game {
 
         Ok(Self {
             shader,
-            texture,
+            texture_color,
+            texture_normal,
             sprites,
             movement: Movement::new_at(vec2(4.0, 4.0)),
         })

@@ -11,7 +11,7 @@ impl Light {
     }
 
     pub fn position(&self) -> Vec4 {
-        self.position.extend(0.5).extend(1.0)
+        self.position.extend(0.2).extend(1.0)
     }
 }
 
@@ -46,12 +46,10 @@ impl GPULightData {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Light bind group"),
             layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: light_uniform.as_entire_binding(),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: light_uniform.as_entire_binding(),
+            }],
         });
 
         Self {
@@ -62,6 +60,10 @@ impl GPULightData {
     }
 
     pub fn update(&self, queue: &wgpu::Queue, light: &Light) {
-        queue.write_buffer(&self.light_uniform, 0, bytemuck::cast_slice(&[light.position()]));
+        queue.write_buffer(
+            &self.light_uniform,
+            0,
+            bytemuck::cast_slice(&[light.position()]),
+        );
     }
 }
