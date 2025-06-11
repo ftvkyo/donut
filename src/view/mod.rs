@@ -1,10 +1,10 @@
 pub mod camera;
 pub mod render_target;
+pub mod texture;
 pub mod vertex;
 
 use std::{borrow::Cow, sync::Arc};
 
-use rgb::Rgba;
 use winit::window::Window;
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     view::{
         camera::{Camera, GPUCameraData},
         render_target::RenderTarget,
+        texture::GPUTextureData,
         vertex::GPUVertexData,
     },
 };
@@ -25,11 +26,9 @@ pub struct View {
 
     render_target: RenderTarget,
 
-    texture_bind_group: wgpu::BindGroup,
-
     camera: Camera,
     camera_data: GPUCameraData,
-
+    texture_data: GPUTextureData,
     vertex_data: GPUVertexData,
 }
 
@@ -61,68 +60,7 @@ impl View {
         );
         let camera_data = GPUCameraData::new(&device, &camera);
 
-        /* Set up the texture stuff */
-
-        let texture_bytes_per_row = game.texture.width() * size_of::<Rgba<u8>>() as u32;
-
-        let texture_extent = wgpu::Extent3d {
-            width: game.texture.width(),
-            height: game.texture.height(),
-            depth_or_array_layers: 1,
-        };
-
-        let texture_view_format = wgpu::TextureFormat::Rgba8Unorm;
-
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: texture_extent,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[texture_view_format],
-        });
-
-        queue.write_texture(
-            texture.as_image_copy(),
-            bytemuck::cast_slice(&game.texture.clone().into_raw()),
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(texture_bytes_per_row),
-                rows_per_image: None,
-            },
-            texture_extent,
-        );
-
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(texture_view_format),
-            ..Default::default()
-        });
-
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Texture BGL"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                    },
-                    count: None,
-                }],
-            });
-
-        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &texture_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&texture_view),
-            }],
-        });
+        let texture_data = GPUTextureData::new(&device, &queue, &game.texture);
 
         let (vertex_data, index_data) = game.vertex_data();
         let vertex_data = GPUVertexData::new(&device, vertex_data, index_data);
@@ -131,7 +69,10 @@ impl View {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&camera_data.bind_group_layout, &texture_bind_group_layout],
+            bind_group_layouts: &[
+                &camera_data.bind_group_layout,
+                &texture_data.bind_group_layout,
+            ],
             push_constant_ranges: &[],
         });
 
@@ -163,13 +104,13 @@ impl View {
         Self {
             device,
             queue,
-            render_target,
             pipeline,
 
-            texture_bind_group,
+            render_target,
 
             camera,
             camera_data,
+            texture_data,
             vertex_data,
         }
     }
@@ -216,7 +157,7 @@ impl View {
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.camera_data.bind_group, &[]);
-            rpass.set_bind_group(1, &self.texture_bind_group, &[]);
+            rpass.set_bind_group(1, &self.texture_data.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.vertex_data.vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.vertex_data.index_buffer.slice(..),
