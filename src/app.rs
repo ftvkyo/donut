@@ -9,19 +9,16 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::{game::Game, renderer::Renderer};
+use crate::{game::Game, view::View};
 
 pub struct App {
-    renderer: Option<Renderer>,
+    view: Option<View>,
     game: Game,
 }
 
 impl App {
     pub fn new(game: Game) -> Self {
-        Self {
-            renderer: None,
-            game,
-        }
+        Self { view: None, game }
     }
 }
 
@@ -39,14 +36,14 @@ impl ApplicationHandler for App {
                 .unwrap(),
         );
 
-        let state = pollster::block_on(Renderer::new(window.clone(), &self.game));
-        self.renderer = Some(state);
+        let state = pollster::block_on(View::new(window.clone(), &self.game));
+        self.view = Some(state);
 
         window.request_redraw();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        let renderer = self.renderer.as_mut().unwrap();
+        let view = self.view.as_mut().unwrap();
 
         match event {
             WindowEvent::CloseRequested => {
@@ -55,12 +52,10 @@ impl ApplicationHandler for App {
                 return;
             }
             WindowEvent::RedrawRequested => {
-                renderer.render(&self.game);
-                renderer.get_window().request_redraw();
+                view.render(&self.game);
             }
             WindowEvent::Resized(_) => {
-                renderer.configure_surface();
-                renderer.update_camera(self.game.movement.get_position());
+                view.resize();
                 // No need to re-render as the next event will be RedrawRequested
             }
             WindowEvent::KeyboardInput { event, .. } => match event.physical_key {
@@ -83,6 +78,9 @@ impl ApplicationHandler for App {
 
         // TODO: make sure this is called at a reasonable frequency (not too frequently, not too infrequently)
         self.game.movement.advance();
-        renderer.update_camera(self.game.movement.get_position());
+        let position = self.game.movement.get_position();
+        view.update_camera(|camera| {
+            camera.set_position(position);
+        });
     }
 }

@@ -8,7 +8,7 @@ mod app;
 mod assets;
 mod config;
 mod game;
-mod renderer;
+mod view;
 
 fn init_logging() {
     use log::LevelFilter;

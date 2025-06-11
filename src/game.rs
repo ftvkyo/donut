@@ -4,7 +4,7 @@ use glam::{Vec2, vec2};
 
 use crate::{
     assets::{Sprite, TextureData},
-    renderer::Vertex,
+    view::Vertex,
 };
 
 pub struct Movement {
