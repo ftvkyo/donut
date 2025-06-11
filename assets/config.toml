@@ -1,6 +1,10 @@
 tile_piece_size = 16
 
 
+[[shaders]]
+name = "main"
+
+
 [[stages]]
 name = "debug-01"
 size = 8

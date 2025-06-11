@@ -61,8 +61,14 @@ pub struct Stage {
 }
 
 #[derive(Deserialize)]
+pub struct Shader {
+    pub name: String,
+}
+
+#[derive(Deserialize)]
 pub struct Config {
     pub tile_piece_size: usize,
     pub tile_sets: Vec<TileSet>,
     pub stages: Vec<Stage>,
+    pub shaders: Vec<Shader>,
 }

@@ -21,6 +21,7 @@ pub type TextureData = ImageBuffer<Rgba<u8>, Vec<u8>>;
 pub struct Assets {
     pub config: Config,
     pub tile_sets_textures: Vec<TextureData>,
+    pub shader_sources: Vec<String>,
 }
 
 impl Assets {
@@ -31,15 +32,13 @@ impl Assets {
         let config = String::from_utf8(config)?;
         let config: Config = toml::from_str(&config)?;
 
+        let parent = path.as_ref().parent().unwrap();
+
         let tile_sets_textures = config
             .tile_sets
             .iter()
             .map(|tset| {
-                let tset_texture = path
-                    .as_ref()
-                    .parent()
-                    .unwrap()
-                    .join(format!("textures/{}.webp", tset.name));
+                let tset_texture = parent.join(format!("textures/{}.webp", tset.name));
 
                 debug!("Loading {}...", tset_texture.to_string_lossy());
 
@@ -51,9 +50,22 @@ impl Assets {
             })
             .collect();
 
+        let shader_sources = config
+            .shaders
+            .iter()
+            .map(|shader| {
+                let shader_path = parent.join(format!("shaders/{}.wgsl", shader.name));
+
+                debug!("Loading {}...", shader_path.to_string_lossy());
+
+                std::fs::read_to_string(shader_path).unwrap()
+            })
+            .collect();
+
         Ok(Self {
             config,
             tile_sets_textures,
+            shader_sources,
         })
     }
 }
@@ -62,6 +74,12 @@ impl TryFrom<Assets> for Game {
     type Error = Box<dyn Error>;
 
     fn try_from(assets: Assets) -> Result<Self, Self::Error> {
+        let shader = assets
+            .shader_sources
+            .into_iter()
+            .next()
+            .ok_or("zero shaders loaded?")?;
+
         let texture = assets
             .tile_sets_textures
             .into_iter()
@@ -96,6 +114,7 @@ impl TryFrom<Assets> for Game {
         trace!("sprites: {sprites:#?}");
 
         Ok(Self {
+            shader,
             texture,
             sprites,
             movement: Movement::new_at(vec2(4.0, 4.0)),

@@ -71,6 +71,7 @@ pub struct Game {
     pub texture: TextureData,
     pub sprites: Vec<Sprite>,
     pub movement: Movement,
+    pub shader: String,
 }
 
 impl Game {
