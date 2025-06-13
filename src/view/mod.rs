@@ -65,7 +65,7 @@ impl View {
         let camera_data = GPUCameraData::new(&device, &camera);
 
         let light = Light::new(game.movement.get_position());
-        let light_data = GPULightData::new(&device, &light);
+        let light_data = GPULightData::new(&device, &camera, &light);
 
         let texture_data =
             GPUTextureData::new(&device, &queue, &game.texture_color, &game.texture_normal);
@@ -133,7 +133,8 @@ impl View {
 
     pub fn update_light(&mut self, f: impl Fn(&mut Light)) {
         f(&mut self.light);
-        self.light_data.update(&self.queue, &self.light);
+        self.light_data
+            .update(&self.queue, &self.camera, &self.light);
     }
 
     pub fn resize(&mut self) {

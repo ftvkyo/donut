@@ -6,8 +6,7 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) frag_pos: vec4<f32>,
-    @location(1) light_pos: vec4<f32>,
-    @location(2) tex_coord: vec2<f32>,
+    @location(1) tex_coord: vec2<f32>,
 };
 
 @group(0) @binding(0)
@@ -16,20 +15,18 @@ var<uniform> view: mat4x4<f32>;
 @group(0) @binding(1)
 var<uniform> proj: mat4x4<f32>;
 
-@group(1) @binding(0)
-var<uniform> light_pos: vec4<f32>;
-
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     var result: VertexOutput;
     result.position = proj * view * vertex.position;
     result.frag_pos = view * vertex.position;
-    // TODO: can be premultiplied once before upload
-    result.light_pos = view * light_pos;
     result.tex_coord = vertex.tex_coord;
 
     return result;
 }
+
+@group(1) @binding(0)
+var<uniform> light_pos: vec4<f32>;
 
 @group(2) @binding(0)
 var texture_color: texture_2d<f32>;
@@ -42,7 +39,7 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
     let light_color = vec3(1.0, 1.0, 1.0);
 
     let view_dir = normalize(-vertex.frag_pos).xyz;
-    let light_vec = vertex.light_pos - vertex.frag_pos;
+    let light_vec = light_pos - vertex.frag_pos;
     let light_dir = normalize(light_vec).xyz;
 
     let light_distance_factor = max(4 - length(light_vec.xyz), 0.0);

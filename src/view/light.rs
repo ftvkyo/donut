@@ -1,5 +1,7 @@
-use glam::{Vec2, Vec4};
+use glam::{Mat4, Vec2, Vec4};
 use wgpu::util::DeviceExt;
+
+use crate::view::camera::Camera;
 
 pub struct Light {
     pub position: Vec2,
@@ -10,11 +12,12 @@ impl Light {
         Self { position }
     }
 
-    pub fn position(&self) -> Vec4 {
-        self.position.extend(0.2).extend(1.0)
+    pub fn position(&self, view: &Mat4) -> Vec4 {
+        *view * self.position.extend(0.2).extend(1.0)
     }
 }
 
+/// To make calculations easier, the light info is uploaded in view coordinates
 pub struct GPULightData {
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group: wgpu::BindGroup,
@@ -22,12 +25,12 @@ pub struct GPULightData {
 }
 
 impl GPULightData {
-    pub fn new(device: &wgpu::Device, light: &Light) -> Self {
+    pub fn new(device: &wgpu::Device, camera: &Camera, light: &Light) -> Self {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Light bind group layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -39,7 +42,7 @@ impl GPULightData {
 
         let light_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Light uniform"),
-            contents: bytemuck::cast_slice(&[light.position()]),
+            contents: bytemuck::cast_slice(&[light.position(&camera.matrix_view())]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -59,11 +62,11 @@ impl GPULightData {
         }
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, light: &Light) {
+    pub fn update(&self, queue: &wgpu::Queue, camera: &Camera, light: &Light) {
         queue.write_buffer(
             &self.light_uniform,
             0,
-            bytemuck::cast_slice(&[light.position()]),
+            bytemuck::cast_slice(&[light.position(&camera.matrix_view())]),
         );
     }
 }
