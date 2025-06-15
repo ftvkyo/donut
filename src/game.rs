@@ -1,102 +1,12 @@
-use std::time::Instant;
-
-use glam::{Vec2, vec2};
-
 use crate::{
     assets::{Sprite, TextureData},
     view::Vertex,
 };
 
-pub struct Movement {
-    position: Vec2,
-    velocity: Vec2,
-
-    pub accel_u: bool,
-    pub accel_r: bool,
-    pub accel_d: bool,
-    pub accel_l: bool,
-
-    last_update: Instant,
-}
-
-impl Movement {
-    const ACCEL: f32 = 4.0;
-    const DECEL: f32 = 2.0;
-
-    pub fn new_at(position: Vec2) -> Self {
-        Self {
-            position,
-            velocity: Vec2::ZERO,
-            accel_u: false,
-            accel_r: false,
-            accel_d: false,
-            accel_l: false,
-            last_update: Instant::now(),
-        }
-    }
-
-    pub fn get_position(&self) -> Vec2 {
-        self.position
-    }
-
-    pub fn advance(&mut self) {
-        let time_delta = self.last_update.elapsed().as_millis() as f32 / 1000.0;
-        self.last_update = Instant::now();
-
-        let dir_x = match (self.accel_r, self.accel_l) {
-            (true, false) => 1.0,
-            (false, true) => -1.0,
-            _ => 0.0,
-        };
-
-        let dir_y = match (self.accel_u, self.accel_d) {
-            (true, false) => 1.0,
-            (false, true) => -1.0,
-            _ => 0.0,
-        };
-
-        let dir = vec2(dir_x, dir_y).normalize_or_zero();
-        if dir.x == 0.0 && dir.y == 0.0 {
-            let dir_decel = -self.velocity.normalize_or_zero();
-            self.velocity += dir_decel * Self::DECEL * time_delta;
-        } else {
-            self.velocity += dir * Self::ACCEL * time_delta;
-        }
-
-        // Clamp speed
-
-        self.velocity.x = self.velocity.x.clamp(-4.0, 4.0);
-        self.velocity.y = self.velocity.y.clamp(-4.0, 4.0);
-
-        // Modify position
-
-        self.position += self.velocity * time_delta;
-
-        // Wrap around if out of bounds
-
-        if self.position.x > 8.0 {
-            self.position.x -= 8.0;
-        }
-
-        if self.position.x < 0.0 {
-            self.position.x += 8.0;
-        }
-
-        if self.position.y > 8.0 {
-            self.position.y -= 8.0;
-        }
-
-        if self.position.y < 0.0 {
-            self.position.y += 8.0;
-        }
-    }
-}
-
 pub struct Game {
     pub texture_color: TextureData,
     pub texture_normal: TextureData,
     pub sprites: Vec<Sprite>,
-    pub movement: Movement,
     pub shader: String,
 }
 

@@ -2,7 +2,6 @@ use std::{error::Error, path::Path};
 
 use anyhow::{Context, bail};
 use enumset::EnumSet;
-use glam::vec2;
 use image::{ImageBuffer, ImageReader, Rgba};
 use log::{debug, trace};
 use rand::{
@@ -12,7 +11,7 @@ use rand::{
 
 use crate::{
     config::{Config, TilePiece, TilePieceDesignation as TPD},
-    game::{Game, Movement},
+    game::Game,
     view::Vertex,
 };
 
@@ -142,7 +141,6 @@ impl TryFrom<Assets> for Game {
             texture_color,
             texture_normal,
             sprites,
-            movement: Movement::new_at(vec2(4.0, 4.0)),
         })
     }
 }

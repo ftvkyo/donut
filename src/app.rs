@@ -1,24 +1,41 @@
 use std::sync::Arc;
 
+use bytemuck::Zeroable;
+use glam::vec4;
 use log::info;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, KeyEvent, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
-use crate::{game::Game, view::View};
+use crate::{
+    game::Game,
+    view::{
+        View,
+        light::{LIGHT_COUNT, Light},
+    },
+};
 
 pub struct App {
     view: Option<View>,
     game: Game,
+    scene: isize,
+    reset: bool,
 }
 
 impl App {
+    const SCENES: isize = 4;
+
     pub fn new(game: Game) -> Self {
-        Self { view: None, game }
+        Self {
+            view: None,
+            game,
+            scene: 0,
+            reset: true,
+        }
     }
 }
 
@@ -58,30 +75,77 @@ impl ApplicationHandler for App {
                 view.resize();
                 // No need to re-render as the next event will be RedrawRequested
             }
-            WindowEvent::KeyboardInput { event, .. } => match event.physical_key {
-                PhysicalKey::Code(KeyCode::ArrowUp) => {
-                    self.game.movement.accel_u = event.state.is_pressed();
-                }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        physical_key,
+                        ..
+                    },
+                ..
+            } => match physical_key {
                 PhysicalKey::Code(KeyCode::ArrowRight) => {
-                    self.game.movement.accel_r = event.state.is_pressed();
-                }
-                PhysicalKey::Code(KeyCode::ArrowDown) => {
-                    self.game.movement.accel_d = event.state.is_pressed();
+                    self.scene += 1;
+                    self.reset = true;
                 }
                 PhysicalKey::Code(KeyCode::ArrowLeft) => {
-                    self.game.movement.accel_l = event.state.is_pressed();
+                    self.scene -= 1;
+                    self.reset = true;
                 }
                 _ => (),
             },
             _ => (),
         }
 
-        // TODO: make sure this is called at a reasonable frequency (not too frequently, not too infrequently)
-        self.game.movement.advance();
-        let position = self.game.movement.get_position().extend(0.2);
+        if self.scene < 0 {
+            self.scene += Self::SCENES;
+        }
+        if self.scene >= Self::SCENES {
+            self.scene -= Self::SCENES;
+        }
 
-        view.update_light(|light| {
-            light.position = position;
-        });
+        if self.reset {
+            self.reset = false;
+
+            view.update_lights(|_camera, lights| {
+                *lights = [Light::zeroed(); LIGHT_COUNT];
+            });
+
+            match self.scene {
+                0 => view.update_lights(|camera, lights| {
+                    let view = camera.matrix_view();
+                    lights[0].position = view * vec4(4.0, 4.0, 0.2, 1.0);
+                    lights[0].color = vec4(1.0, 1.0, 1.0, 1.0);
+                }),
+                1 => view.update_lights(|camera, lights| {
+                    let view = camera.matrix_view();
+                    lights[0].position = view * vec4(3.0, 4.0, 0.2, 1.0);
+                    lights[0].color = vec4(1.0, 1.0, 1.0, 1.0);
+                    lights[1].position = view * vec4(5.0, 4.0, 0.2, 1.0);
+                    lights[1].color = vec4(1.0, 1.0, 1.0, 1.0);
+                }),
+                2 => view.update_lights(|camera, lights| {
+                    let view = camera.matrix_view();
+                    lights[0].position = view * vec4(4.0, 5.5, 0.5, 1.0);
+                    lights[0].color = vec4(1.0, 1.0, 1.0, 1.0);
+                    lights[1].position = view * vec4(6.0, 2.5, 1.0, 1.0);
+                    lights[1].color = vec4(1.0, 1.0, 1.0, 1.0);
+                    lights[2].position = view * vec4(2.0, 2.5, 2.0, 1.0);
+                    lights[2].color = vec4(1.0, 1.0, 1.0, 1.0);
+                }),
+                3 => view.update_lights(|camera, lights| {
+                    let view = camera.matrix_view();
+                    lights[0].position = view * vec4(3.0, 3.0, 0.5, 1.0);
+                    lights[0].color = vec4(1.0, 0.0, 0.0, 1.0);
+                    lights[1].position = view * vec4(3.0, 5.0, 0.5, 1.0);
+                    lights[1].color = vec4(0.0, 1.0, 0.0, 1.0);
+                    lights[2].position = view * vec4(5.0, 3.0, 0.5, 1.0);
+                    lights[2].color = vec4(0.0, 0.0, 1.0, 1.0);
+                    lights[3].position = view * vec4(5.0, 5.0, 0.5, 1.0);
+                    lights[3].color = vec4(0.5, 0.5, 0.5, 1.0);
+                }),
+                _ => panic!("No such scene: {}", self.scene),
+            }
+        }
     }
 }

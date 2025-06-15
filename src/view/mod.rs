@@ -6,6 +6,7 @@ pub mod vertex;
 
 use std::{borrow::Cow, sync::Arc};
 
+use bytemuck::Zeroable;
 use glam::vec2;
 use winit::window::Window;
 
@@ -13,7 +14,7 @@ use crate::{
     game::Game,
     view::{
         camera::{Camera, GPUCameraData},
-        light::{GPULightData, Light},
+        light::{GPULightsData, LIGHT_COUNT, Light, Lights},
         render_target::RenderTarget,
         texture::GPUTextureData,
         vertex::GPUVertexData,
@@ -31,8 +32,8 @@ pub struct View {
 
     camera: Camera,
     camera_data: GPUCameraData,
-    light: Light,
-    light_data: GPULightData,
+    lights: Lights,
+    lights_data: GPULightsData,
     texture_data: GPUTextureData,
     vertex_data: GPUVertexData,
 }
@@ -64,8 +65,8 @@ impl View {
         let camera = Camera::new(render_target.get_aspect_ratio(), vec2(4.0, 4.0));
         let camera_data = GPUCameraData::new(&device, &camera);
 
-        let light = Light::new(game.movement.get_position().extend(0.2));
-        let light_data = GPULightData::new(&device, &camera, &light);
+        let lights = [Light::zeroed(); LIGHT_COUNT];
+        let lights_data = GPULightsData::new(&device, &lights);
 
         let texture_data =
             GPUTextureData::new(&device, &queue, &game.texture_color, &game.texture_normal);
@@ -79,7 +80,7 @@ impl View {
             label: None,
             bind_group_layouts: &[
                 &camera_data.bind_group_layout,
-                &light_data.bind_group_layout,
+                &lights_data.bind_group_layout,
                 &texture_data.bind_group_layout,
             ],
             push_constant_ranges: &[],
@@ -119,8 +120,8 @@ impl View {
 
             camera,
             camera_data,
-            light,
-            light_data,
+            lights,
+            lights_data,
             texture_data,
             vertex_data,
         }
@@ -131,10 +132,9 @@ impl View {
         self.camera_data.update(&self.queue, &self.camera);
     }
 
-    pub fn update_light(&mut self, f: impl Fn(&mut Light)) {
-        f(&mut self.light);
-        self.light_data
-            .update(&self.queue, &self.camera, &self.light);
+    pub fn update_lights(&mut self, f: impl Fn(&Camera, &mut Lights)) {
+        f(&self.camera, &mut self.lights);
+        self.lights_data.update(&self.queue, &self.lights);
     }
 
     pub fn resize(&mut self) {
@@ -169,7 +169,7 @@ impl View {
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.camera_data.bind_group, &[]);
-            rpass.set_bind_group(1, &self.light_data.bind_group, &[]);
+            rpass.set_bind_group(1, &self.lights_data.bind_group, &[]);
             rpass.set_bind_group(2, &self.texture_data.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.vertex_data.vertex_buffer.slice(..));
             rpass.set_index_buffer(

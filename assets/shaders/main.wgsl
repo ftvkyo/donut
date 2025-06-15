@@ -25,15 +25,22 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     return result;
 }
 
-// Light Position in View coordinate space
-@group(1) @binding(0)
-var<uniform> light_pos: vec4<f32>;
+const LIGHT_COUNT: u32 = 32;
 
-// Texture Color
+struct Light {
+    position: vec4<f32>,
+    color: vec4<f32>,
+}
+
+// Lights (positions in view coordinate space)
+@group(1) @binding(0)
+var<uniform> lights: array<Light, LIGHT_COUNT>;
+
+// Texture color
 @group(2) @binding(0)
 var texture_color: texture_2d<f32>;
 
-// Texture Normal in Model coordinate space
+// Texture normal in Model coordinate space
 @group(2) @binding(1)
 var texture_normal: texture_2d<f32>;
 
@@ -59,30 +66,36 @@ fn get_normal(tex_coord: vec2<f32>) -> vec3<f32> {
 }
 
 fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>) -> vec3<f32> {
-    let color = vec3(1.0);
-    let radius = 4.0;
-
-    // Direction: Eye -> Fragment
-    let eye2frag = normalize(- frag_pos).xyz;
-
-    // Direction: Fragment -> Light
-    let frag2light = normalize(light_pos - frag_pos).xyz;
-
     let ambient_strength = 0.15;
-
-    let diffuse_strength = 0.5;
-    let diffuse = max(dot(frag_normal, frag2light), 0.0);
-
     let specular_strength = 0.75;
-    let specular = pow(max(dot(eye2frag, reflect(-frag2light, frag_normal)), 0.0), 32);
+    let diffuse_strength = 0.5;
 
-    let distance_factor = max(radius - length((light_pos - frag_pos).xyz), 0.0);
+    let radius = 3.0;
 
-    return color * (
-        ambient_strength
-        + diffuse * diffuse_strength * distance_factor
-        + specular * specular_strength * distance_factor
-    );
+    var val: vec3<f32> = vec3(ambient_strength);
+
+    for (var i: u32 = 0; i < LIGHT_COUNT; i++) {
+        let light = lights[i];
+
+        if (light.color.a == 0.0) {
+            continue;
+        }
+
+        // Direction: Eye -> Fragment
+        let eye2frag = normalize(- frag_pos).xyz;
+
+        // Direction: Fragment -> Light
+        let frag2light = normalize(light.position - frag_pos).xyz;
+
+        let diffuse = diffuse_strength * max(dot(frag_normal, frag2light), 0.0);
+        let specular = specular_strength * pow(max(dot(eye2frag, reflect(-frag2light, frag_normal)), 0.0), 32);
+
+        let distance_factor = max(radius - length((light.position - frag_pos).xyz), 0.0);
+
+        val += light.color.rgb * distance_factor * (diffuse + specular);
+    }
+
+    return val;
 }
 
 @fragment
