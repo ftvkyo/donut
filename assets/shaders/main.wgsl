@@ -37,6 +37,10 @@ var texture_color: texture_2d<f32>;
 @group(2) @binding(1)
 var texture_normal: texture_2d<f32>;
 
+fn get_color(tex_coord: vec2<f32>) -> vec4<f32> {
+    return textureLoad(texture_color, vec2<i32>(tex_coord), 0);
+}
+
 fn get_normal(tex_coord: vec2<f32>) -> vec3<f32> {
     // x, y, z in range [0.0, 1.0], model coordinate space
     let model_tex = textureLoad(texture_normal, vec2<i32>(tex_coord), 0).xyz;
@@ -54,37 +58,44 @@ fn get_normal(tex_coord: vec2<f32>) -> vec3<f32> {
     return view_dir;
 }
 
+fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>) -> vec3<f32> {
+    let color = vec3(1.0);
+    let radius = 4.0;
+
+    // Direction: Eye -> Fragment
+    let eye2frag = normalize(- frag_pos).xyz;
+
+    // Direction: Fragment -> Light
+    let frag2light = normalize(light_pos - frag_pos).xyz;
+
+    let ambient_strength = 0.15;
+
+    let diffuse_strength = 0.5;
+    let diffuse = max(dot(frag_normal, frag2light), 0.0);
+
+    let specular_strength = 0.75;
+    let specular = pow(max(dot(eye2frag, reflect(-frag2light, frag_normal)), 0.0), 32);
+
+    let distance_factor = max(radius - length((light_pos - frag_pos).xyz), 0.0);
+
+    return color * (
+        ambient_strength
+        + diffuse * diffuse_strength * distance_factor
+        + specular * specular_strength * distance_factor
+    );
+}
+
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let light_color = vec3(1.0);
-
-    let view_dir = normalize(- vertex.frag_pos).xyz;
-    let light_vec = (light_pos - vertex.frag_pos).xyz;
-    let light_dir = normalize(light_vec);
-
-    let light_distance_factor = max(4 - length(light_vec), 0.0);
-
-    let frag_normal = get_normal(vertex.tex_coord);
-
-    let light_ambient_strength = 0.15;
-
-    let light_diffuse_strength = 0.5;
-    let light_diffuse = max(dot(frag_normal, light_dir), 0.0);
-
-    let light_specular_strength = 0.75;
-    let light_specular = pow(max(dot(view_dir, reflect(-light_dir, frag_normal)), 0.0), 32);
-
-    let color = textureLoad(texture_color, vec2<i32>(vertex.tex_coord), 0);
+    let pos = vertex.frag_pos;
+    let color = get_color(vertex.tex_coord);
+    let normal = get_normal(vertex.tex_coord);
 
     if color.a == 0.0 {
         discard;
     }
 
-    let light = light_color * (
-        light_ambient_strength
-        + light_diffuse * light_diffuse_strength * light_distance_factor
-        + light_specular * light_specular_strength * light_distance_factor
-    );
+    let light = get_light(pos, normal);
 
     return vec4(color.rgb * light, 1.0);
 }
