@@ -1,19 +1,19 @@
-use glam::{Mat4, Vec2, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::view::camera::Camera;
 
 pub struct Light {
-    pub position: Vec2,
+    pub position: Vec3,
 }
 
 impl Light {
-    pub fn new(position: Vec2) -> Self {
+    pub fn new(position: Vec3) -> Self {
         Self { position }
     }
 
     pub fn position(&self, view: &Mat4) -> Vec4 {
-        *view * self.position.extend(0.2).extend(1.0)
+        *view * self.position.extend(1.0)
     }
 }
 

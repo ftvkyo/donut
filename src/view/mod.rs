@@ -64,7 +64,7 @@ impl View {
         let camera = Camera::new(render_target.get_aspect_ratio(), vec2(4.0, 4.0));
         let camera_data = GPUCameraData::new(&device, &camera);
 
-        let light = Light::new(game.movement.get_position());
+        let light = Light::new(game.movement.get_position().extend(0.2));
         let light_data = GPULightData::new(&device, &camera, &light);
 
         let texture_data =
