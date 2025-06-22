@@ -56,8 +56,8 @@ impl View {
 
         let shader = assets
             .shaders
-            .get(&game.shader_name)
-            .with_context(|| format!("No shader called '{}'?", game.shader_name))?;
+            .get("main")
+            .context("No shader called 'main'?")?;
 
         let pipeline = renderer.create_pipeline(shader, &gpu_data);
 
