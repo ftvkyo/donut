@@ -63,12 +63,12 @@ impl ApplicationHandler for App {
                 return;
             }
             WindowEvent::RedrawRequested => {
-                view.renderer.render(&view.pipeline, &view.gpu_data);
+                view.render();
                 // Schedule rendering of the next frame
-                view.renderer.request_redraw();
+                view.request_redraw();
             }
             WindowEvent::Resized(_) => {
-                view.renderer.resize();
+                view.resize();
                 // No need to re-render as the next event will be RedrawRequested
             }
             _ => (),

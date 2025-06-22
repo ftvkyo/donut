@@ -1,0 +1,182 @@
+use std::{borrow::Cow, sync::Arc};
+
+use anyhow::{Context, Result};
+use winit::window::Window;
+
+use crate::{
+    assets::{Assets, TextureData},
+    game::{Game, camera::Camera, light::Lights},
+    view::{
+        Vertex, camera::GPUCameraData, light::GPULightsData, surface::Surface,
+        texture::GPUTextureData, vertex::GPUVertexData,
+    },
+};
+
+pub struct Renderer {
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
+    window: Arc<Window>,
+    surface: Surface,
+}
+
+impl Renderer {
+    pub async fn new(window: Arc<Window>) -> Self {
+        let instance = wgpu::Instance::new(&Default::default());
+        let adapter = instance
+            .request_adapter(&Default::default())
+            .await
+            .expect("Failed to acquire an adapter");
+        let (device, queue) = adapter
+            .request_device(&Default::default())
+            .await
+            .expect("Failed to acquire a device");
+
+        let surface = Surface::new(&instance, &adapter, &device, &window);
+
+        Self {
+            window,
+            device,
+            queue,
+            surface,
+        }
+    }
+
+    pub fn create_texture_data(
+        &self,
+        texture_color: &TextureData,
+        texture_normal: &TextureData,
+    ) -> GPUTextureData {
+        GPUTextureData::new(&self.device, &self.queue, texture_color, texture_normal)
+    }
+
+    pub fn create_camera_data(&self, camera: &Camera) -> GPUCameraData {
+        GPUCameraData::new(
+            &self.device,
+            camera.matrix_view(),
+            camera.matrix_proj(self.surface.aspect_ratio()),
+        )
+    }
+
+    pub fn create_light_data(&self, lights: &Lights, camera: &Camera) -> GPULightsData {
+        GPULightsData::new(&self.device, &lights.data(camera.matrix_view()))
+    }
+
+    pub fn create_vertex_data(
+        &self,
+        vertex_data: Vec<Vertex>,
+        index_data: Vec<u16>,
+    ) -> GPUVertexData {
+        GPUVertexData::new(&self.device, vertex_data, index_data)
+    }
+
+    pub fn create_pipeline(
+        &self,
+        shader: &String,
+        camera: &GPUCameraData,
+        lights: &GPULightsData,
+        texture: &GPUTextureData,
+    ) -> wgpu::RenderPipeline {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(shader)),
+            });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[
+                    &camera.bind_group_layout,
+                    &lights.bind_group_layout,
+                    &texture.bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[GPUVertexData::LAYOUT],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(self.surface.surface_view_format.into())],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: Some(wgpu::Face::Back),
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                multisample: Default::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        pipeline
+    }
+
+    pub fn request_redraw(&self) {
+        self.window.request_redraw();
+    }
+
+    pub fn resize(&mut self) {
+        self.surface.resize(&self.device, self.window.inner_size());
+    }
+
+    pub fn render(
+        &mut self,
+        pipeline: &wgpu::RenderPipeline,
+        camera: &GPUCameraData,
+        lights: &GPULightsData,
+        texture: &GPUTextureData,
+        vertex: &GPUVertexData,
+    ) {
+        let (surface_texture, surface_view) = self.surface.texture();
+
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &surface_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            rpass.push_debug_group("Prepare data for draw.");
+            rpass.set_pipeline(pipeline);
+            rpass.set_bind_group(0, &camera.bind_group, &[]);
+            rpass.set_bind_group(1, &lights.bind_group, &[]);
+            rpass.set_bind_group(2, &texture.bind_group, &[]);
+            rpass.set_vertex_buffer(0, vertex.vertex_buffer.slice(..));
+            rpass.set_index_buffer(vertex.index_buffer.slice(..), GPUVertexData::INDEX_FORMAT);
+            rpass.pop_debug_group();
+
+            rpass.insert_debug_marker("Draw!");
+            rpass.draw_indexed(0..vertex.index_count as u32, 0, 0..1);
+        }
+
+        self.queue.submit([encoder.finish()]);
+
+        self.window.pre_present_notify();
+        surface_texture.present();
+    }
+}
