@@ -1,33 +1,5 @@
-use glam::{Mat4, Vec2, Vec3};
+use glam::Mat4;
 use wgpu::util::DeviceExt;
-
-pub struct Camera {
-    pub aspect_ratio: f32,
-    pub position: Vec2,
-}
-
-impl Camera {
-    const FOV: f32 = std::f32::consts::FRAC_PI_2;
-    const DISTANCE: f32 = 4.0; // with PI/2, this means we see 4 tiles up and 4 tiles down
-    const NEAR: f32 = 1.0;
-    const FAR: f32 = 10.0;
-
-    pub fn new(aspect_ratio: f32, position: Vec2) -> Self {
-        Self {
-            aspect_ratio,
-            position,
-        }
-    }
-
-    pub fn matrix_view(&self) -> Mat4 {
-        let position = self.position.extend(Self::DISTANCE);
-        Mat4::look_to_rh(position, Vec3::NEG_Z, Vec3::Y)
-    }
-
-    pub fn matrix_proj(&self) -> Mat4 {
-        Mat4::perspective_rh(Self::FOV, self.aspect_ratio, Self::NEAR, Self::FAR)
-    }
-}
 
 pub struct GPUCameraData {
     pub bind_group_layout: wgpu::BindGroupLayout,
@@ -37,10 +9,7 @@ pub struct GPUCameraData {
 }
 
 impl GPUCameraData {
-    pub fn new(device: &wgpu::Device, camera: &Camera) -> Self {
-        let view = camera.matrix_view();
-        let proj = camera.matrix_proj();
-
+    pub fn new(device: &wgpu::Device, view: Mat4, proj: Mat4) -> Self {
         let uniform_type = wgpu::BindingType::Buffer {
             ty: wgpu::BufferBindingType::Uniform,
             has_dynamic_offset: false,
@@ -100,10 +69,7 @@ impl GPUCameraData {
         }
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, camera: &Camera) {
-        let view = camera.matrix_view();
-        let proj = camera.matrix_proj();
-
+    pub fn update(&self, queue: &wgpu::Queue, view: Mat4, proj: Mat4) {
         queue.write_buffer(&self.view_uniform, 0, bytemuck::cast_slice(&[view]));
         queue.write_buffer(&self.proj_uniform, 0, bytemuck::cast_slice(&[proj]));
     }

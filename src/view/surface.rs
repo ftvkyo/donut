@@ -1,21 +1,20 @@
 use std::sync::Arc;
 
-use winit::window::Window;
+use winit::{dpi::PhysicalSize, window::Window};
 
-pub struct RenderTarget {
-    pub window: Arc<Window>,
-
+pub struct Surface {
+    size: PhysicalSize<u32>,
     pub surface: wgpu::Surface<'static>,
     pub surface_format: wgpu::TextureFormat,
     pub surface_view_format: wgpu::TextureFormat,
 }
 
-impl RenderTarget {
+impl Surface {
     pub fn new(
         instance: &wgpu::Instance,
         adapter: &wgpu::Adapter,
         device: &wgpu::Device,
-        window: Arc<Window>,
+        window: &Arc<Window>,
     ) -> Self {
         let surface = instance.create_surface(window.clone()).unwrap();
         let capabilities = surface.get_capabilities(&adapter);
@@ -29,7 +28,7 @@ impl RenderTarget {
         let surface_view_format = surface_format.remove_srgb_suffix();
 
         let render_target = Self {
-            window,
+            size: window.inner_size(),
             surface,
             surface_format,
             surface_view_format,
@@ -41,15 +40,13 @@ impl RenderTarget {
     }
 
     pub fn configure(&self, device: &wgpu::Device) {
-        let size = self.get_size();
-
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: self.surface_format,
             view_formats: vec![self.surface_view_format],
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            width: size.width,
-            height: size.height,
+            width: self.size.width,
+            height: self.size.height,
             desired_maximum_frame_latency: 2,
             present_mode: wgpu::PresentMode::AutoVsync,
         };
@@ -57,24 +54,20 @@ impl RenderTarget {
         self.surface.configure(device, &surface_config);
     }
 
-    pub fn request_redraw(&self) {
-        self.window.request_redraw();
+    pub fn size(&self) -> PhysicalSize<u32> {
+        self.size
     }
 
-    pub fn pre_present_notify(&self) {
-        self.window.pre_present_notify();
+    pub fn resize(&mut self, device: &wgpu::Device, size: PhysicalSize<u32>) {
+        self.size = size;
+        self.configure(device);
     }
 
-    pub fn get_size(&self) -> winit::dpi::PhysicalSize<u32> {
-        self.window.inner_size()
+    pub fn aspect_ratio(&self) -> f32 {
+        self.size.width as f32 / self.size.height as f32
     }
 
-    pub fn get_aspect_ratio(&self) -> f32 {
-        let size = self.get_size();
-        size.width as f32 / size.height as f32
-    }
-
-    pub fn get_texture(&self) -> (wgpu::SurfaceTexture, wgpu::TextureView) {
+    pub fn texture(&self) -> (wgpu::SurfaceTexture, wgpu::TextureView) {
         let surface_texture = self
             .surface
             .get_current_texture()

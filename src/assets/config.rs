@@ -1,18 +1,20 @@
-use std::ops::Deref;
+use std::{ops::Deref, path::Path};
 
+use anyhow::Result;
 use enumset::{EnumSet, EnumSetType};
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
-pub struct TilePieceWeight(f32);
+pub struct TileWeight(f32);
 
-impl Default for TilePieceWeight {
+impl Default for TileWeight {
     fn default() -> Self {
         Self(1.0)
     }
 }
 
-impl Deref for TilePieceWeight {
+impl Deref for TileWeight {
     type Target = f32;
 
     fn deref(&self) -> &Self::Target {
@@ -23,7 +25,7 @@ impl Deref for TilePieceWeight {
 #[derive(Debug, EnumSetType, Serialize, Deserialize)]
 #[enumset(serialize_repr = "list")]
 #[serde(rename_all = "lowercase")]
-pub enum TilePieceDesignation {
+pub enum TileDesignation {
     Top,
     Right,
     Bottom,
@@ -32,31 +34,30 @@ pub enum TilePieceDesignation {
 }
 
 #[derive(Deserialize)]
-pub struct TilePiece {
+pub struct Tile {
     pub x: usize,
     pub y: usize,
     #[serde(default)]
-    pub is: EnumSet<TilePieceDesignation>,
+    pub is: EnumSet<TileDesignation>,
     #[serde(default)]
-    pub weight: TilePieceWeight,
+    pub weight: TileWeight,
 }
 
 #[derive(Deserialize)]
 pub struct TileSet {
     pub name: String,
-    pub pieces: Vec<TilePiece>,
+    pub tiles: Vec<Tile>,
 }
 
 #[derive(Deserialize)]
 pub struct StageLayer {
-    // pub tile_name: String,
+    pub tile_name: String,
     pub tile_map: String,
 }
 
 #[derive(Deserialize)]
 pub struct Stage {
-    // pub name: String,
-    pub size: usize,
+    pub name: String,
     pub layers: Vec<StageLayer>,
 }
 
@@ -67,8 +68,16 @@ pub struct Shader {
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub tile_piece_size: usize,
+    pub tile_size: usize,
     pub tile_sets: Vec<TileSet>,
     pub stages: Vec<Stage>,
     pub shaders: Vec<Shader>,
+}
+
+impl Config {
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+        debug!("Loading config {}...", path.as_ref().to_string_lossy());
+        let config = toml::from_str(&std::fs::read_to_string(path)?)?;
+        Ok(config)
+    }
 }

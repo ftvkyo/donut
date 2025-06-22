@@ -1,12 +1,14 @@
-use std::error::Error;
-
+use anyhow::Result;
 use log::{debug, error, info};
 
-use crate::{assets::Assets, game::Game};
+use crate::{
+    app::App,
+    assets::{Assets, Config},
+    game::Game,
+};
 
 mod app;
 mod assets;
-mod config;
 mod game;
 mod view;
 
@@ -25,18 +27,18 @@ fn init_logging() {
         .init();
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
+fn run() -> Result<()> {
     use winit::event_loop::{ControlFlow, EventLoop};
 
-    let assets = Assets::load("assets/config.toml")?;
-    let game = Game::try_from(assets)?;
+    let config = Config::load("assets/config.toml")?;
+    let assets = Assets::resolve(config, "assets")?;
 
     debug!("Creating event loop...");
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
     debug!("Creating the app...");
-    let mut app = app::App::new(game);
+    let mut app = App::new(assets, Game::new());
 
     debug!("Running the app...");
     event_loop.run_app(&mut app)?;

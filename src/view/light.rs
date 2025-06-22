@@ -1,17 +1,4 @@
-use bytemuck::{Pod, Zeroable};
-use glam::Vec4;
 use wgpu::util::DeviceExt;
-
-pub const LIGHT_COUNT: usize = 32;
-
-#[derive(Pod, Zeroable, Clone, Copy)]
-#[repr(C)]
-pub struct Light {
-    pub position: Vec4,
-    pub color: Vec4,
-}
-
-pub type Lights = [Light; LIGHT_COUNT];
 
 /// To make calculations easier, the light info is uploaded in view coordinates
 pub struct GPULightsData {
@@ -21,7 +8,7 @@ pub struct GPULightsData {
 }
 
 impl GPULightsData {
-    pub fn new(device: &wgpu::Device, lights: &[Light; LIGHT_COUNT]) -> Self {
+    pub fn new(device: &wgpu::Device, lights: &[u8]) -> Self {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Light bind group layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -30,9 +17,7 @@ impl GPULightsData {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(
-                        (size_of::<Light>() * LIGHT_COUNT) as u64,
-                    ),
+                    min_binding_size: wgpu::BufferSize::new(lights.len() as u64),
                 },
                 count: None,
             }],
@@ -40,7 +25,7 @@ impl GPULightsData {
 
         let light_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Light uniform"),
-            contents: bytemuck::cast_slice(lights),
+            contents: &lights,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -60,7 +45,7 @@ impl GPULightsData {
         }
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, lights: &[Light; LIGHT_COUNT]) {
-        queue.write_buffer(&self.light_uniform, 0, bytemuck::cast_slice(lights));
+    pub fn update(&self, queue: &wgpu::Queue, lights: &[u8]) {
+        queue.write_buffer(&self.light_uniform, 0, lights);
     }
 }

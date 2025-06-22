@@ -1,4 +1,4 @@
-tile_piece_size = 16
+tile_size = 16
 
 
 [[shaders]]
@@ -7,7 +7,7 @@ name = "main"
 
 [[stages]]
 name = "debug-01"
-size = 8
+size = [8, 8]
 
 [[stages.layers]]
 tile_name = "wall"
@@ -27,7 +27,7 @@ __x__x__
 name = "wall"
 
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 0
 y = 0
 is = [
@@ -35,7 +35,7 @@ is = [
     "left",
 ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 1
 y = 0
 is = [
@@ -43,7 +43,7 @@ is = [
     "right",
 ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 0
 y = 1
 is = [
@@ -51,7 +51,7 @@ is = [
     "left",
 ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 1
 y = 1
 is = [
@@ -60,7 +60,7 @@ is = [
 ]
 
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 2
 y = 0
 is = [
@@ -69,7 +69,7 @@ is = [
     "right",
 ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 3
 y = 0
 is = [
@@ -78,7 +78,7 @@ is = [
     "left",
 ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 2
 y = 1
 is = [
@@ -87,7 +87,7 @@ is = [
     "right",
 ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 3
 y = 1
 is = [
@@ -97,42 +97,42 @@ is = [
 ]
 
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 0
 y = 2
 is = [ "right" ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 1
 y = 2
 is = [ "bottom" ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 0
 y = 3
 is = [ "top" ]
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 1
 y = 3
 is = [ "left" ]
 
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 2
 y = 2
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 3
 y = 2
 weight = 0.2
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 2
 y = 3
 weight = 0.3
 
-[[tile_sets.pieces]]
+[[tile_sets.tiles]]
 x = 3
 y = 3
 weight = 0.1
