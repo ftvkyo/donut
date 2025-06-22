@@ -63,6 +63,7 @@ impl ApplicationHandler for App {
                 return;
             }
             WindowEvent::RedrawRequested => {
+                view.update_lights(&self.game.lights, &self.game.camera);
                 view.render();
                 // Schedule rendering of the next frame
                 view.request_redraw();
@@ -73,5 +74,7 @@ impl ApplicationHandler for App {
             }
             _ => (),
         }
+
+        self.game.advance();
     }
 }

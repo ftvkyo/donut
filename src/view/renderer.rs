@@ -1,16 +1,12 @@
 use std::{borrow::Cow, sync::Arc};
 
-use anyhow::{Context, Result};
 use winit::window::Window;
 
-use crate::{
-    assets::{Assets, TextureData},
-    game::{Game, camera::Camera, light::Lights},
+use crate::
     view::{
-        Vertex, camera::GPUCameraData, light::GPULightsData, surface::Surface,
-        texture::GPUTextureData, vertex::GPUVertexData,
-    },
-};
+        camera::GPUCameraData, lights::GPULightsData, surface::Surface, texture::GPUTextureData, vertex::GPUVertexData
+    }
+;
 
 pub struct Renderer {
     pub device: wgpu::Device,
@@ -39,34 +35,6 @@ impl Renderer {
             queue,
             surface,
         }
-    }
-
-    pub fn create_texture_data(
-        &self,
-        texture_color: &TextureData,
-        texture_normal: &TextureData,
-    ) -> GPUTextureData {
-        GPUTextureData::new(&self.device, &self.queue, texture_color, texture_normal)
-    }
-
-    pub fn create_camera_data(&self, camera: &Camera) -> GPUCameraData {
-        GPUCameraData::new(
-            &self.device,
-            camera.matrix_view(),
-            camera.matrix_proj(self.surface.aspect_ratio()),
-        )
-    }
-
-    pub fn create_light_data(&self, lights: &Lights, camera: &Camera) -> GPULightsData {
-        GPULightsData::new(&self.device, &lights.data(camera.matrix_view()))
-    }
-
-    pub fn create_vertex_data(
-        &self,
-        vertex_data: Vec<Vertex>,
-        index_data: Vec<u16>,
-    ) -> GPUVertexData {
-        GPUVertexData::new(&self.device, vertex_data, index_data)
     }
 
     pub fn create_pipeline(
@@ -131,6 +99,10 @@ impl Renderer {
 
     pub fn resize(&mut self) {
         self.surface.resize(&self.device, self.window.inner_size());
+    }
+    
+    pub fn aspect_ratio(&self) -> f32 {
+        self.surface.aspect_ratio()
     }
 
     pub fn render(

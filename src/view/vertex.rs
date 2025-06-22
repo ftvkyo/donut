@@ -3,6 +3,8 @@ use std::{any::type_name, mem::offset_of};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
+use crate::view::renderer::Renderer;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 pub struct Vertex {
@@ -39,7 +41,7 @@ impl GPUVertexData {
     };
 
     pub fn new(
-        device: &wgpu::Device,
+        renderer: &Renderer,
         vertex_data: Vec<Vertex>,
         index_data: Vec<VertexIndex>,
     ) -> Self {
@@ -50,13 +52,13 @@ impl GPUVertexData {
             );
         }
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let vertex_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(&vertex_data),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let index_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
             contents: bytemuck::cast_slice(&index_data),
             usage: wgpu::BufferUsages::INDEX,

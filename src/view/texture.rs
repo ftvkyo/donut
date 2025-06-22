@@ -1,6 +1,6 @@
 use image::Rgba;
 
-use crate::assets::TextureData;
+use crate::{assets::TextureData, view::renderer::Renderer};
 
 pub struct GPUTextureData {
     pub bind_group_layout: wgpu::BindGroupLayout,
@@ -13,8 +13,7 @@ pub struct GPUTextureData {
 
 impl GPUTextureData {
     pub fn new(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        renderer: &Renderer,
         color_data: &TextureData,
         normal_data: &TextureData,
     ) -> Self {
@@ -33,7 +32,7 @@ impl GPUTextureData {
 
         let bytes_per_row = Some(color_data.width() * size_of::<Rgba<u8>>() as u32);
 
-        let texture_color = device.create_texture(&wgpu::TextureDescriptor {
+        let texture_color = renderer.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Color texture"),
             size,
             mip_level_count: 1,
@@ -44,7 +43,7 @@ impl GPUTextureData {
             view_formats: &[view_format],
         });
 
-        queue.write_texture(
+        renderer.queue.write_texture(
             texture_color.as_image_copy(),
             bytemuck::cast_slice(&color_data),
             wgpu::TexelCopyBufferLayout {
@@ -60,7 +59,7 @@ impl GPUTextureData {
             ..Default::default()
         });
 
-        let texture_normal = device.create_texture(&wgpu::TextureDescriptor {
+        let texture_normal = renderer.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Normal texture"),
             size,
             mip_level_count: 1,
@@ -71,7 +70,7 @@ impl GPUTextureData {
             view_formats: &[],
         });
 
-        queue.write_texture(
+        renderer.queue.write_texture(
             texture_normal.as_image_copy(),
             bytemuck::cast_slice(&normal_data),
             wgpu::TexelCopyBufferLayout {
@@ -84,7 +83,7 @@ impl GPUTextureData {
 
         let texture_normal_view = texture_normal.create_view(&Default::default());
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let bind_group_layout = renderer.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Texture bind group layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
@@ -110,7 +109,7 @@ impl GPUTextureData {
             ],
         });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = renderer.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Texture bind group"),
             layout: &bind_group_layout,
             entries: &[

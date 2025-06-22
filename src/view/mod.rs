@@ -1,5 +1,5 @@
 pub mod camera;
-pub mod light;
+pub mod lights;
 pub mod renderer;
 pub mod surface;
 pub mod texture;
@@ -12,9 +12,9 @@ use winit::window::Window;
 
 use crate::{
     assets::Assets,
-    game::Game,
+    game::{Game, camera::Camera, light::Lights},
     view::{
-        camera::GPUCameraData, light::GPULightsData, renderer::Renderer, texture::GPUTextureData,
+        camera::GPUCameraData, lights::GPULightsData, renderer::Renderer, texture::GPUTextureData,
         vertex::GPUVertexData,
     },
 };
@@ -51,11 +51,11 @@ impl View {
             index_data.extend_from_slice(&sprite.index_data(i as u16 * 4));
         }
 
-        let camera_data = renderer.create_camera_data(&game.camera);
-        let lights_data = renderer.create_light_data(&game.lights, &game.camera);
+        let camera_data = GPUCameraData::new(&renderer, &game.camera);
+        let lights_data = GPULightsData::new(&renderer, &game.lights, &game.camera);
         let texture_data =
-            renderer.create_texture_data(&tile_set.texture_color, &tile_set.texture_normal);
-        let vertex_data = renderer.create_vertex_data(vertex_data, index_data);
+            GPUTextureData::new(&renderer, &tile_set.texture_color, &tile_set.texture_normal);
+        let vertex_data = GPUVertexData::new(&renderer, vertex_data, index_data);
 
         let shader = assets
             .shaders
@@ -75,11 +75,19 @@ impl View {
             pipeline,
         })
     }
-    
+
+    pub fn update_camera(&self, camera: &Camera) {
+        self.camera_data.update(&self.renderer, camera);
+    }
+
+    pub fn update_lights(&self, lights: &Lights, camera: &Camera) {
+        self.lights_data.update(&self.renderer, lights, camera);
+    }
+
     pub fn request_redraw(&self) {
         self.renderer.request_redraw();
     }
-    
+
     pub fn resize(&mut self) {
         self.renderer.resize();
     }

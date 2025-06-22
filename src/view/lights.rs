@@ -1,5 +1,7 @@
 use wgpu::util::DeviceExt;
 
+use crate::{game::{camera::Camera, light::Lights}, view::renderer::Renderer};
+
 /// To make calculations easier, the light info is uploaded in view coordinates
 pub struct GPULightsData {
     pub bind_group_layout: wgpu::BindGroupLayout,
@@ -8,8 +10,10 @@ pub struct GPULightsData {
 }
 
 impl GPULightsData {
-    pub fn new(device: &wgpu::Device, lights: &[u8]) -> Self {
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    pub fn new(renderer: &Renderer, lights: &Lights, camera: &Camera) -> Self {
+        let lights = lights.data(camera.matrix_view());
+        
+        let bind_group_layout = renderer.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Light bind group layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -23,13 +27,13 @@ impl GPULightsData {
             }],
         });
 
-        let light_uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let light_uniform = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Light uniform"),
             contents: &lights,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = renderer.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Light bind group"),
             layout: &bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
@@ -45,7 +49,8 @@ impl GPULightsData {
         }
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, lights: &[u8]) {
-        queue.write_buffer(&self.light_uniform, 0, lights);
+    pub fn update(&self, renderer: &Renderer, lights: &Lights, camera: &Camera) {
+        let lights = lights.data(camera.matrix_view());
+        renderer.queue.write_buffer(&self.light_uniform, 0, &lights);
     }
 }
