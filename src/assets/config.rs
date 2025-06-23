@@ -53,6 +53,8 @@ pub struct TileSet {
 pub struct StageLayer {
     pub tile_name: String,
     pub tile_map: String,
+    #[serde(default)]
+    pub z: f32,
 }
 
 #[derive(Deserialize)]

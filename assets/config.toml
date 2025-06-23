@@ -12,15 +12,29 @@ size = [8, 8]
 [[stages.layers]]
 tile_name = "wall"
 tile_map = """\
-__x__x__
-_xx__xx_
 xxxxxxxx
-__xxxx__
-__xxxx__
 xxxxxxxx
-_xx__xx_
-__x__x__
+xxxxxxxx
+xxxxxxxx
+xxxxxxxx
+xxxxxxxx
+xxxxxxxx
+xxxxxxxx
 """
+
+[[stages.layers]]
+tile_name = "wall"
+tile_map = """\
+xxxxxxxx
+x______x
+x______x
+x______x
+x______x
+x______x
+x______x
+xxxxxxxx
+"""
+z = 0.1
 
 
 [[tile_sets]]
@@ -30,92 +44,64 @@ name = "wall"
 [[tile_sets.tiles]]
 x = 0
 y = 0
-is = [
-    "top",
-    "left",
-]
+is = ["top", "left"]
 
 [[tile_sets.tiles]]
 x = 1
 y = 0
-is = [
-    "top",
-    "right",
-]
+is = ["top", "right"]
 
 [[tile_sets.tiles]]
 x = 0
 y = 1
-is = [
-    "bottom",
-    "left",
-]
+is = ["bottom", "left"]
 
 [[tile_sets.tiles]]
 x = 1
 y = 1
-is = [
-    "bottom",
-    "right",
-]
+is = ["bottom", "right"]
 
 
 [[tile_sets.tiles]]
 x = 2
 y = 0
-is = [
-    "inner",
-    "bottom",
-    "right",
-]
+is = ["inner", "bottom", "right"]
 
 [[tile_sets.tiles]]
 x = 3
 y = 0
-is = [
-    "inner",
-    "bottom",
-    "left",
-]
+is = ["inner", "bottom", "left"]
 
 [[tile_sets.tiles]]
 x = 2
 y = 1
-is = [
-    "inner",
-    "top",
-    "right",
-]
+is = ["inner", "top", "right"]
 
 [[tile_sets.tiles]]
 x = 3
 y = 1
-is = [
-    "inner",
-    "top",
-    "left",
-]
+is = ["inner", "top", "left"]
 
 
 [[tile_sets.tiles]]
 x = 0
 y = 2
-is = [ "right" ]
+is = ["right"]
 
 [[tile_sets.tiles]]
 x = 1
 y = 2
-is = [ "bottom" ]
+is = ["bottom"]
 
 [[tile_sets.tiles]]
 x = 0
 y = 3
-is = [ "top" ]
+is = ["top"]
 
 [[tile_sets.tiles]]
 x = 1
 y = 3
-is = [ "left" ]
+is = ["left"]
 
 
 [[tile_sets.tiles]]

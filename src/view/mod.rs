@@ -12,9 +12,12 @@ use winit::window::Window;
 
 use crate::{
     assets::Assets,
-    game::{Game, camera::Camera, light::Lights},
+    game::Game,
     view::{
-        camera::GPUCameraData, lights::GPULightsData, renderer::Renderer, texture::GPUTextureData,
+        camera::GPUCameraData,
+        lights::GPULightsData,
+        renderer::{GPUPipelineData, Renderer},
+        texture::GPUTextureData,
         vertex::GPUVertexData,
     },
 };
@@ -26,14 +29,13 @@ pub struct View {
 
     camera_data: GPUCameraData,
     lights_data: GPULightsData,
-    texture_data: GPUTextureData,
-    vertex_data: GPUVertexData,
-
-    pipeline: wgpu::RenderPipeline,
+    pipelines: Vec<GPUPipelineData>,
 }
 
 impl View {
     pub fn new(window: Arc<Window>, assets: &Assets, game: &Game) -> Result<Self> {
+        let shader_name = "main";
+
         let renderer = pollster::block_on(Renderer::new(window));
 
         let stage = assets
@@ -41,47 +43,45 @@ impl View {
             .get(&game.stage_name)
             .with_context(|| format!("No stage called '{}'?", game.stage_name))?;
 
-        let (tile_set, sprites) = stage.layers[0].sprites(&assets.tile_sets, assets.tile_size)?;
-
-        let mut vertex_data = Vec::with_capacity(sprites.len() * 4);
-        let mut index_data = Vec::with_capacity(sprites.len() * 6);
-
-        for (i, sprite) in sprites.iter().enumerate() {
-            vertex_data.extend_from_slice(&sprite.vertex_data());
-            index_data.extend_from_slice(&sprite.index_data(i as u16 * 4));
-        }
-
-        let camera_data = GPUCameraData::new(&renderer, &game.camera);
-        let lights_data = GPULightsData::new(&renderer, &game.lights, &game.camera);
-        let texture_data =
-            GPUTextureData::new(&renderer, &tile_set.texture_color, &tile_set.texture_normal);
-        let vertex_data = GPUVertexData::new(&renderer, vertex_data, index_data);
-
         let shader = assets
             .shaders
-            .get("main")
-            .context("No shader called 'main'?")?;
+            .get(shader_name)
+            .with_context(|| format!("No shader called '{shader_name}'?"))?;
 
-        let pipeline = renderer.create_pipeline(shader, &camera_data, &lights_data, &texture_data);
+        let camera_data = GPUCameraData::new(&renderer, &game);
+        let lights_data = GPULightsData::new(&renderer, &game);
+
+        let mut pipelines = Vec::with_capacity(stage.layers.len());
+        for layer in &stage.layers {
+            let (tile_set, sprites) = layer.sprites(&assets.tile_sets, assets.tile_size)?;
+
+            let texture_data = GPUTextureData::new(&renderer, &tile_set);
+            let vertex_data = GPUVertexData::new(&renderer, &sprites);
+
+            let pipeline =
+                renderer.create_pipeline(shader, &camera_data, &lights_data, &texture_data);
+
+            pipelines.push(GPUPipelineData {
+                texture_data,
+                vertex_data,
+                pipeline,
+            });
+        }
 
         Ok(Self {
             renderer,
-
             camera_data,
             lights_data,
-            texture_data,
-            vertex_data,
-
-            pipeline,
+            pipelines,
         })
     }
 
-    pub fn update_camera(&self, camera: &Camera) {
-        self.camera_data.update(&self.renderer, camera);
+    pub fn update_camera(&self, game: &Game) {
+        self.camera_data.update(&self.renderer, game);
     }
 
-    pub fn update_lights(&self, lights: &Lights, camera: &Camera) {
-        self.lights_data.update(&self.renderer, lights, camera);
+    pub fn update_lights(&self, game: &Game) {
+        self.lights_data.update(&self.renderer, game);
     }
 
     pub fn request_redraw(&self) {
@@ -93,12 +93,7 @@ impl View {
     }
 
     pub fn render(&mut self) {
-        self.renderer.render(
-            &self.pipeline,
-            &self.camera_data,
-            &self.lights_data,
-            &self.texture_data,
-            &self.vertex_data,
-        );
+        self.renderer
+            .render(&self.camera_data, &self.lights_data, &self.pipelines);
     }
 }

@@ -3,7 +3,7 @@ use std::{any::type_name, mem::offset_of};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
-use crate::view::renderer::Renderer;
+use crate::{assets::Sprite, view::renderer::Renderer};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
@@ -40,11 +40,15 @@ impl GPUVertexData {
         ],
     };
 
-    pub fn new(
-        renderer: &Renderer,
-        vertex_data: Vec<Vertex>,
-        index_data: Vec<VertexIndex>,
-    ) -> Self {
+    pub fn new(renderer: &Renderer, sprites: &Vec<Sprite>) -> Self {
+        let mut vertex_data = Vec::with_capacity(sprites.len() * 4);
+        let mut index_data = Vec::with_capacity(sprites.len() * 6);
+
+        for (i, sprite) in sprites.iter().enumerate() {
+            vertex_data.extend_from_slice(&sprite.vertex_data());
+            index_data.extend_from_slice(&sprite.index_data(i as u16 * 4));
+        }
+
         if vertex_data.len() >= VertexIndex::MAX as usize {
             panic!(
                 "Too many vertices to index with {}",
@@ -52,17 +56,21 @@ impl GPUVertexData {
             );
         }
 
-        let vertex_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertex_data),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let vertex_buffer = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertex_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let index_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&index_data),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        let index_buffer = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(&index_data),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
         Self {
             vertex_buffer,

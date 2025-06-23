@@ -17,6 +17,7 @@ pub use config::TileWeight;
 pub use sprite::Sprite;
 
 pub use stage::Stage;
+pub use stage::StageLayer;
 
 pub use tile_set::TextureData;
 pub use tile_set::TileSet;
@@ -47,7 +48,10 @@ impl Assets {
                 bail!("Tile set with the name {name} already exists");
             }
 
-            tile_sets.insert(name, TileSet::load(tile_set, &path.as_ref().join("textures"))?);
+            tile_sets.insert(
+                name,
+                TileSet::load(tile_set, &path.as_ref().join("textures"))?,
+            );
         }
 
         let mut stages = BTreeMap::new();

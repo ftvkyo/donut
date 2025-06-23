@@ -2,11 +2,16 @@ use std::{borrow::Cow, sync::Arc};
 
 use winit::window::Window;
 
-use crate::
-    view::{
-        camera::GPUCameraData, lights::GPULightsData, surface::Surface, texture::GPUTextureData, vertex::GPUVertexData
-    }
-;
+use crate::view::{
+    camera::GPUCameraData, lights::GPULightsData, surface::Surface, texture::GPUTextureData,
+    vertex::GPUVertexData,
+};
+
+pub struct GPUPipelineData {
+    pub texture_data: GPUTextureData,
+    pub vertex_data: GPUVertexData,
+    pub pipeline: wgpu::RenderPipeline,
+}
 
 pub struct Renderer {
     pub device: wgpu::Device,
@@ -100,18 +105,16 @@ impl Renderer {
     pub fn resize(&mut self) {
         self.surface.resize(&self.device, self.window.inner_size());
     }
-    
+
     pub fn aspect_ratio(&self) -> f32 {
         self.surface.aspect_ratio()
     }
 
     pub fn render(
         &mut self,
-        pipeline: &wgpu::RenderPipeline,
         camera: &GPUCameraData,
         lights: &GPULightsData,
-        texture: &GPUTextureData,
-        vertex: &GPUVertexData,
+        pipelines: &Vec<GPUPipelineData>,
     ) {
         let (surface_texture, surface_view) = self.surface.texture();
 
@@ -133,17 +136,22 @@ impl Renderer {
                 occlusion_query_set: None,
             });
 
-            rpass.push_debug_group("Prepare data for draw.");
-            rpass.set_pipeline(pipeline);
-            rpass.set_bind_group(0, &camera.bind_group, &[]);
-            rpass.set_bind_group(1, &lights.bind_group, &[]);
-            rpass.set_bind_group(2, &texture.bind_group, &[]);
-            rpass.set_vertex_buffer(0, vertex.vertex_buffer.slice(..));
-            rpass.set_index_buffer(vertex.index_buffer.slice(..), GPUVertexData::INDEX_FORMAT);
-            rpass.pop_debug_group();
+            for p in pipelines {
+                rpass.push_debug_group("Prepare data for draw.");
+                rpass.set_pipeline(&p.pipeline);
+                rpass.set_bind_group(0, &camera.bind_group, &[]);
+                rpass.set_bind_group(1, &lights.bind_group, &[]);
+                rpass.set_bind_group(2, &p.texture_data.bind_group, &[]);
+                rpass.set_vertex_buffer(0, p.vertex_data.vertex_buffer.slice(..));
+                rpass.set_index_buffer(
+                    p.vertex_data.index_buffer.slice(..),
+                    GPUVertexData::INDEX_FORMAT,
+                );
+                rpass.pop_debug_group();
 
-            rpass.insert_debug_marker("Draw!");
-            rpass.draw_indexed(0..vertex.index_count as u32, 0, 0..1);
+                rpass.insert_debug_marker("Draw!");
+                rpass.draw_indexed(0..p.vertex_data.index_count as u32, 0, 0..1);
+            }
         }
 
         self.queue.submit([encoder.finish()]);

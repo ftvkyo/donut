@@ -8,13 +8,14 @@ use crate::assets::{Sprite, TileDesignation as TD, TileSet, TileSets};
 pub struct StageLayer {
     tile_name: String,
     tile_map: BTreeSet<(usize, usize)>,
+    z: f32,
 }
 
-impl StageLayer {
-    pub fn parse<S: AsRef<str>>(tile_name: String, s: S) -> Self {
+impl From<super::config::StageLayer> for StageLayer {
+    fn from(value: super::config::StageLayer) -> Self {
         let mut tile_map = BTreeSet::new();
 
-        let s = s.as_ref().trim();
+        let s = value.tile_map.trim();
         for (y, row) in s.split('\n').rev().enumerate() {
             for (x, c) in row.chars().enumerate() {
                 if c == 'x' {
@@ -24,11 +25,14 @@ impl StageLayer {
         }
 
         Self {
-            tile_name,
+            tile_name: value.tile_name,
             tile_map,
+            z: value.z,
         }
     }
+}
 
+impl StageLayer {
     fn is_filled(&self, x: isize, y: isize) -> bool {
         if x < 0 || y < 0 {
             return false;
@@ -56,7 +60,7 @@ impl StageLayer {
             y,
             w,
             h,
-            z: 0.0,
+            z: self.z,
             tex_x: tex_x as f32 * tex_w,
             tex_y: tex_y as f32 * tex_h,
             tex_w,
@@ -167,7 +171,7 @@ impl From<super::config::Stage> for Stage {
         let mut layers = Vec::with_capacity(value.layers.len());
 
         for layer in value.layers {
-            layers.push(StageLayer::parse(layer.tile_name, layer.tile_map));
+            layers.push(StageLayer::from(layer));
         }
 
         Self { layers }
