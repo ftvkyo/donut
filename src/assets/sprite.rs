@@ -1,4 +1,4 @@
-use crate::view::Vertex;
+use crate::view::{Vertex, VertexIndex};
 
 #[derive(Debug)]
 pub struct Sprite {
@@ -38,7 +38,7 @@ impl Sprite {
         ]
     }
 
-    pub fn index_data(&self, offset: u16) -> [u16; 6] {
+    pub fn index_data(&self, offset: u16) -> [VertexIndex; 6] {
         [
             offset + 0,
             offset + 1,

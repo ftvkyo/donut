@@ -6,7 +6,7 @@ use enumset::EnumSet;
 use crate::assets::{Sprite, TileDesignation as TD, TileSet, TileSets};
 
 pub struct StageLayer {
-    tile_name: String,
+    pub tile_name: String,
     tile_map: BTreeSet<(usize, usize)>,
     z: f32,
 }
@@ -41,11 +41,7 @@ impl StageLayer {
         return self.tile_map.get(&(x as usize, y as usize)).is_some();
     }
 
-    pub fn sprites<'a>(
-        &self,
-        tile_sets: &'a TileSets,
-        tile_size: usize,
-    ) -> Result<(&'a TileSet, Vec<Sprite>)> {
+    pub fn sprites(&self, tile_sets: &TileSets, tile_size: usize) -> Result<Vec<Sprite>> {
         let tile_set = tile_sets
             .get(&self.tile_name)
             .with_context(|| format!("No tileset found with name {}", self.tile_name))?;
@@ -158,7 +154,7 @@ impl StageLayer {
             sprites.push(sprite(x, y, tp_bl.x, tp_bl.y));
         }
 
-        Ok((tile_set, sprites))
+        Ok(sprites)
     }
 }
 

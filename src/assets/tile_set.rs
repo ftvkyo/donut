@@ -8,7 +8,8 @@ use rand::distr::Distribution;
 
 use crate::assets::{Tile, TileDesignation};
 
-pub type TextureData = ImageBuffer<Rgba<u8>, Vec<u8>>;
+pub type TexturePixel = Rgba<u8>;
+pub type TextureData = ImageBuffer<TexturePixel, Vec<u8>>;
 
 pub struct TileSet {
     tiles: Vec<super::Tile>,

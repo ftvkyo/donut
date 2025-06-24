@@ -63,8 +63,8 @@ impl ApplicationHandler for App {
                 return;
             }
             WindowEvent::RedrawRequested => {
-                view.update_lights(&self.game);
-                view.render();
+                view.update_lights(&self.game).unwrap();
+                view.render().unwrap();
                 // Schedule rendering of the next frame
                 view.request_redraw();
             }

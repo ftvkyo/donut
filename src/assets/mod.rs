@@ -20,6 +20,7 @@ pub use stage::Stage;
 pub use stage::StageLayer;
 
 pub use tile_set::TextureData;
+pub use tile_set::TexturePixel;
 pub use tile_set::TileSet;
 
 pub type TileSets = BTreeMap<String, TileSet>;
