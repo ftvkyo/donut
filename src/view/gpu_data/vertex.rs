@@ -1,6 +1,6 @@
 use std::mem::offset_of;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 

@@ -33,7 +33,7 @@ pub struct View {
     gpu: GPU,
     window: Window,
 
-    pub gpu_data: ViewGPUData,
+    gpu_data: ViewGPUData,
 
     main_pipeline: wgpu::RenderPipeline,
 }

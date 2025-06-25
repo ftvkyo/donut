@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anyhow::{Context, Result};
 use enumset::EnumSet;
 
-use crate::assets::{Sprite, TileDesignation as TD, TileSet, TileSets};
+use crate::assets::{Sprite, TileDesignation as TD, TileSets};
 
 pub struct StageLayer {
     pub tile_name: String,
