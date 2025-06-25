@@ -50,6 +50,12 @@ pub struct TileSet {
 }
 
 #[derive(Deserialize)]
+pub struct LightAnimation {
+    pub name: String,
+    pub frames: usize,
+}
+
+#[derive(Deserialize)]
 pub struct StageLayer {
     pub tile_name: String,
     pub tile_map: String,
@@ -72,6 +78,7 @@ pub struct Shader {
 pub struct Config {
     pub tile_size: usize,
     pub tile_sets: Vec<TileSet>,
+    pub lights: Vec<LightAnimation>,
     pub stages: Vec<Stage>,
     pub shaders: Vec<Shader>,
 }

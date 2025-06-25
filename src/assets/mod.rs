@@ -4,9 +4,12 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use log::debug;
 
+mod animation;
 mod config;
 mod stage;
 mod tile_set;
+
+pub use animation::LightAnimation;
 
 pub use config::Config;
 pub use config::Tile;
@@ -20,6 +23,7 @@ pub use tile_set::TextureData;
 pub use tile_set::TexturePixel;
 pub use tile_set::TileSet;
 
+pub type Animations = BTreeMap<String, LightAnimation>;
 pub type TileSets = BTreeMap<String, TileSet>;
 pub type Stages = BTreeMap<String, Stage>;
 pub type Shaders = BTreeMap<String, String>;
@@ -27,6 +31,7 @@ pub type Shaders = BTreeMap<String, String>;
 pub struct Assets {
     pub tile_size: usize,
     pub tile_sets: TileSets,
+    pub lights: Animations,
     pub stages: Stages,
     pub shaders: Shaders,
 }
@@ -49,6 +54,20 @@ impl Assets {
             tile_sets.insert(
                 name,
                 TileSet::load(tile_set, &path.as_ref().join("textures"))?,
+            );
+        }
+
+        let mut lights = BTreeMap::new();
+        for light in config.lights {
+            let name = light.name.clone();
+
+            if lights.contains_key(&name) {
+                bail!("Animation with the name {name} already exists");
+            }
+
+            lights.insert(
+                name,
+                LightAnimation::load(light, &path.as_ref().join("textures"))?,
             );
         }
 
@@ -80,6 +99,7 @@ impl Assets {
         Ok(Self {
             tile_size: config.tile_size,
             tile_sets,
+            lights,
             stages,
             shaders,
         })

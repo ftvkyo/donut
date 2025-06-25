@@ -37,8 +37,11 @@ fn run() -> Result<()> {
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
+    debug!("Initialising game state...");
+    let game = Game::new(&assets)?;
+
     debug!("Creating the app...");
-    let mut app = App::new(assets, Game::new());
+    let mut app = App::new(assets, game);
 
     debug!("Running the app...");
     event_loop.run_app(&mut app)?;

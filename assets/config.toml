@@ -4,6 +4,14 @@ tile_size = 16
 [[shaders]]
 name = "main"
 
+[[shaders]]
+name = "light"
+
+
+[[lights]]
+name = "fire"
+frames = 8
+
 
 [[stages]]
 name = "debug-01"
