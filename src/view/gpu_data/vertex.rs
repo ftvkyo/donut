@@ -1,19 +1,15 @@
 use std::mem::offset_of;
 
 use anyhow::{Result, ensure};
-use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
-use crate::view::gpu::GPU;
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
-pub struct Vertex {
-    pub pos: [f32; 4],
-    pub tex_coord: [f32; 2],
-}
-
-pub type VertexIndex = u16;
+use crate::view::{
+    gpu::GPU,
+    gpu_struct::{
+        quad::{Quad, quads2vidata},
+        vertex::{Vertex, VertexIndex},
+    },
+};
 
 pub struct VertexData {
     vbuffer: wgpu::Buffer,
@@ -67,6 +63,11 @@ impl VertexData {
         })
     }
 
+    pub fn new_quads(gpu: &GPU, quads: &[Quad]) -> Result<Self> {
+        let (vdata, idata) = quads2vidata(quads);
+        Self::new(gpu, &vdata, &idata)
+    }
+
     pub fn update(&mut self, gpu: &GPU, vdata: &[Vertex], idata: &[VertexIndex]) -> Result<()> {
         ensure!(vdata.len() < VertexIndex::MAX as usize);
         ensure!(vdata.len() * size_of::<Vertex>() <= self.vbuffer.size() as usize);
@@ -81,6 +82,11 @@ impl VertexData {
         self.icount = idata.len();
 
         Ok(())
+    }
+
+    pub fn update_quads(&mut self, gpu: &GPU, quads: &[Quad]) -> Result<()> {
+        let (vdata, idata) = quads2vidata(quads);
+        self.update(gpu, &vdata, &idata)
     }
 
     pub fn get_vertex_buffer(&self) -> &wgpu::Buffer {

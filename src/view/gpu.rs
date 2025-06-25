@@ -1,9 +1,22 @@
 use anyhow::{Context, Result};
 
-use crate::view::{
-    gpu_data::{PipelineConfig, RenderPass, VertexData},
-    window::Window,
-};
+use crate::view::{gpu_data::VertexData, window::Window};
+
+pub struct PipelineConfig<'s, 'g> {
+    pub shader: &'s String,
+    pub groups: &'g [&'g wgpu::BindGroupLayout],
+    pub output: wgpu::TextureFormat,
+}
+
+pub struct PipelineExecution<'p, 'g, 'v> {
+    pub pipeline: &'p wgpu::RenderPipeline,
+    pub gdata: &'g [&'g wgpu::BindGroup],
+    pub vdata: &'v VertexData,
+}
+
+pub struct RenderPass<'p> {
+    pub pipelines: &'p [PipelineExecution<'p, 'p, 'p>],
+}
 
 pub struct GPU {
     pub instance: wgpu::Instance,

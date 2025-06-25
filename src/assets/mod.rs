@@ -5,7 +5,6 @@ use anyhow::{Result, bail};
 use log::debug;
 
 mod config;
-mod sprite;
 mod stage;
 mod tile_set;
 
@@ -13,8 +12,6 @@ pub use config::Config;
 pub use config::Tile;
 pub use config::TileDesignation;
 pub use config::TileWeight;
-
-pub use sprite::Sprite;
 
 pub use stage::Stage;
 pub use stage::StageLayer;

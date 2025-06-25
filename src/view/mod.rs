@@ -1,5 +1,6 @@
 mod gpu;
 mod gpu_data;
+mod gpu_struct;
 mod window;
 
 use std::{collections::BTreeMap, sync::Arc};
@@ -12,13 +13,13 @@ use window::Window;
 use crate::{
     assets::Assets,
     game::Game,
-    view::gpu_data::{
-        PipelineConfig, PipelineExecution, RenderPass, TextureGroup, TextureMultiplexer,
-        UniformGroup, VertexData,
+    view::{
+        gpu::{PipelineConfig, PipelineExecution, RenderPass},
+        gpu_data::{TextureGroup, TextureMultiplexer, UniformGroup, VertexData},
     },
 };
 
-pub use gpu_data::{Vertex, VertexIndex};
+pub use gpu_struct::quad::Quad;
 
 // Handles for the data stored on the GPU
 struct ViewGPUData {
@@ -72,16 +73,8 @@ impl View {
 
             let mut stage_layers = Vec::with_capacity(stage.layers.len());
             for layer in &stage.layers {
-                let layer_sprites = layer.sprites(&assets.tile_sets, assets.tile_size)?;
-
-                let mut layer_vertices = Vec::with_capacity(layer_sprites.len() * 4);
-                let mut layer_indices = Vec::with_capacity(layer_sprites.len() * 6);
-                for (i, sprite) in layer_sprites.iter().enumerate() {
-                    layer_vertices.extend_from_slice(&sprite.vertex_data());
-                    layer_indices.extend_from_slice(&sprite.index_data(i as u16 * 4));
-                }
-
-                let stage_layer = VertexData::new(&gpu, &layer_vertices, &layer_indices)?;
+                let layer_quads = layer.quads(&assets.tile_sets, assets.tile_size)?;
+                let stage_layer = VertexData::new_quads(&gpu, &layer_quads)?;
                 stage_layers.push((layer.tile_name.clone(), stage_layer));
             }
 

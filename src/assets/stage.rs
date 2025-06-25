@@ -2,8 +2,12 @@ use std::collections::BTreeSet;
 
 use anyhow::{Context, Result};
 use enumset::EnumSet;
+use glam::{vec2, vec3};
 
-use crate::assets::{Sprite, TileDesignation as TD, TileSets};
+use crate::{
+    assets::{TileDesignation as TD, TileSets},
+    view::Quad,
+};
 
 pub struct StageLayer {
     pub tile_name: String,
@@ -41,7 +45,7 @@ impl StageLayer {
         return self.tile_map.get(&(x as usize, y as usize)).is_some();
     }
 
-    pub fn sprites(&self, tile_sets: &TileSets, tile_size: usize) -> Result<Vec<Sprite>> {
+    pub fn quads(&self, tile_sets: &TileSets, tile_size: usize) -> Result<Vec<Quad>> {
         let tile_set = tile_sets
             .get(&self.tile_name)
             .with_context(|| format!("No tileset found with name {}", self.tile_name))?;
@@ -51,16 +55,12 @@ impl StageLayer {
         let (w, h) = (0.5, 0.5);
         let (tex_w, tex_h) = (tile_size as f32, tile_size as f32);
 
-        let sprite = |x, y, tex_x, tex_y| Sprite {
-            x,
-            y,
-            w,
-            h,
-            z: self.z,
-            tex_x: tex_x as f32 * tex_w,
-            tex_y: tex_y as f32 * tex_h,
-            tex_w,
-            tex_h,
+        let sprite = |x, y, tex_x, tex_y| Quad {
+            pos: vec3(x + w / 2.0, y + h / 2.0, self.z),
+            dim: vec2(w, h),
+            rot: 0.0,
+            tex_pos: vec2(tex_x as f32 * tex_w, tex_y as f32 * tex_h),
+            tex_dim: vec2(tex_w, tex_w),
         };
 
         for (x, y) in self.tile_map.iter() {
