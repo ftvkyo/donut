@@ -1,12 +1,14 @@
 struct VertexInput {
     @location(0) position: vec4<f32>,
-    @location(1) tex_coord: vec2<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) tex_coord: vec2<f32>,
 }
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) frag_pos: vec4<f32>,
-    @location(1) tex_coord: vec2<f32>,
+    @location(1) frag_normal: vec3<f32>,
+    @location(2) tex_coord: vec2<f32>,
 };
 
 @group(0) @binding(0)
@@ -20,6 +22,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     var result: VertexOutput;
     result.position = proj * view * vertex.position;
     result.frag_pos = view * vertex.position;
+    result.frag_normal = vertex.normal;
     result.tex_coord = vertex.tex_coord;
 
     return result;
@@ -65,9 +68,10 @@ fn get_normal(tex_coord: vec2<f32>) -> vec3<f32> {
     return view_dir;
 }
 
-fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>) -> vec3<f32> {
+fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, tex_normal: vec3<f32>) -> vec3<f32> {
     let ambient_strength = 0.15;
-    let specular_strength = 0.75;
+    let specular_strength = 0.5;
+    let specular_shininess = 32.0;
     let diffuse_strength = 0.5;
 
     let radius = 3.0;
@@ -81,15 +85,30 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>) -> vec3<f32> {
             continue;
         }
 
-        // Direction: Eye -> Fragment
-        let eye2frag = normalize(- frag_pos).xyz;
-
         // Direction: Fragment -> Light
-        let frag2light = normalize(light.position - frag_pos).xyz;
+        let dir_light = normalize(light.position - frag_pos).xyz;
+        
+        if (dot(frag_normal, dir_light) <= 0.0) {
+            continue;
+        }
 
-        let diffuse = diffuse_strength * max(dot(frag_normal, frag2light), 0.0);
-        let specular = specular_strength * pow(max(dot(eye2frag, reflect(-frag2light, frag_normal)), 0.0), 32);
+        // Diffuse component:
+        // - depends on the angle between the light ray and fragment normal
+        // - clamped with 0 from below
+        let diffuse = diffuse_strength * max(dot(tex_normal, dir_light), 0.0);
 
+        // Direction: Fragment -> Eye
+        let dir_eye = normalize(- frag_pos).xyz;
+
+        // Direction: halfway (between dir_light & dir_eye)
+        let dir_halfway = normalize(dir_light + dir_eye);
+
+        // Specular component:
+        // - depends on the fragment normal, light ray and eye ray
+        // - clamped with 0 from below
+        let specular = specular_strength * pow(max(dot(tex_normal, dir_halfway), 0.0), specular_shininess);
+
+        // Decrease the strength of the diffuse and specular components with distance
         let distance_factor = max(radius - length((light.position - frag_pos).xyz), 0.0);
 
         val += light.color.rgb * distance_factor * (diffuse + specular);
@@ -100,15 +119,14 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let pos = vertex.frag_pos;
-    let color = get_color(vertex.tex_coord);
-    let normal = get_normal(vertex.tex_coord);
+    let tex_color = get_color(vertex.tex_coord);
+    let tex_normal = get_normal(vertex.tex_coord);
 
-    if color.a == 0.0 {
+    if tex_color.a == 0.0 {
         discard;
     }
 
-    let light = get_light(pos, normal);
+    let light = get_light(vertex.frag_pos, vertex.frag_normal, tex_normal);
 
-    return vec4(color.rgb * light, 1.0);
+    return vec4(tex_color.rgb * light, 1.0);
 }

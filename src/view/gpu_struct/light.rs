@@ -1,6 +1,8 @@
 use bytemuck::{Pod, Zeroable};
 use glam::Vec4;
 
+/// Data for light calculations.
+// Member alignment should be a power of 2: https://www.w3.org/TR/WGSL/#alignment-and-size
 #[derive(Pod, Zeroable, Clone, Copy)]
 #[repr(C)]
 pub struct UniformLight {

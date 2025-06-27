@@ -1,5 +1,3 @@
-use std::mem::offset_of;
-
 use anyhow::{Result, ensure};
 use wgpu::util::DeviceExt;
 
@@ -18,25 +16,6 @@ pub struct VertexData {
 }
 
 impl VertexData {
-    pub const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint16;
-
-    pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
-        array_stride: size_of::<Vertex>() as wgpu::BufferAddress,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &[
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: offset_of!(Vertex, pos) as u64,
-                shader_location: 0,
-            },
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x2,
-                offset: offset_of!(Vertex, tex_coord) as u64,
-                shader_location: 1,
-            },
-        ],
-    };
-
     pub fn new(gpu: &GPU, vdata: &[Vertex], idata: &[VertexIndex]) -> Result<Self> {
         ensure!(vdata.len() < VertexIndex::MAX as usize);
 

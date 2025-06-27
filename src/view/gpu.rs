@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 
 use crate::view::{
     gpu_data::{TextureDepth, VertexData},
+    gpu_struct::vertex::Vertex,
     window::Window,
 };
 
@@ -74,7 +75,7 @@ impl GPU {
                     module: &shader,
                     entry_point: None,
                     compilation_options: Default::default(),
-                    buffers: &[VertexData::LAYOUT],
+                    buffers: &[Vertex::LAYOUT],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
@@ -139,7 +140,7 @@ impl GPU {
                 rpass.set_vertex_buffer(0, pconfig.vdata.get_vertex_buffer().slice(..));
                 rpass.set_index_buffer(
                     pconfig.vdata.get_index_buffer().slice(..),
-                    VertexData::INDEX_FORMAT,
+                    Vertex::INDEX_FORMAT,
                 );
 
                 rpass.draw_indexed(0..pconfig.vdata.get_index_count(), 0, 0..1);
