@@ -29,7 +29,6 @@ pub type Stages = BTreeMap<String, Stage>;
 pub type Shaders = BTreeMap<String, String>;
 
 pub struct Assets {
-    pub tile_size: usize,
     pub tile_sets: TileSets,
     pub lights: Animations,
     pub stages: Stages,
@@ -97,7 +96,6 @@ impl Assets {
         }
 
         Ok(Self {
-            tile_size: config.tile_size,
             tile_sets,
             lights,
             stages,

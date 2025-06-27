@@ -103,7 +103,7 @@ impl View {
 
             let mut main_quads = Vec::with_capacity(stage.layers.len());
             for layer in &stage.layers {
-                let layer_quads = layer.quads(&assets.tile_sets, assets.tile_size)?;
+                let layer_quads = layer.quads(&assets.tile_sets)?;
                 let stage_layer = VertexData::new_quads(&gpu, &layer_quads)?;
                 main_quads.push((layer.tile_name.clone(), stage_layer));
             }

@@ -45,7 +45,7 @@ impl StageLayer {
         return self.tile_map.get(&(x as usize, y as usize)).is_some();
     }
 
-    pub fn quads(&self, tile_sets: &TileSets, tile_size: usize) -> Result<Vec<Quad>> {
+    pub fn quads(&self, tile_sets: &TileSets) -> Result<Vec<Quad>> {
         let tile_set = tile_sets
             .get(&self.tile_name)
             .with_context(|| format!("No tileset found with name {}", self.tile_name))?;
@@ -53,7 +53,7 @@ impl StageLayer {
         let mut sprites = Vec::with_capacity(self.tile_map.len());
 
         let (w, h) = (0.5, 0.5);
-        let (tex_w, tex_h) = (tile_size as f32, tile_size as f32);
+        let (tex_w, tex_h) = (tile_set.tile_size[0] as f32, tile_set.tile_size[1] as f32);
 
         let sprite = |x, y, tex_x, tex_y| Quad {
             pos: vec3(x + w / 2.0, y + h / 2.0, self.z),

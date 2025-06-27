@@ -1,6 +1,3 @@
-tile_size = 16
-
-
 [[shaders]]
 name = "main"
 
@@ -58,6 +55,7 @@ z = 0.5
 
 [[tile_sets]]
 name = "wall"
+tile_size = [16, 16]
 
 
 [[tile_sets.tiles]]

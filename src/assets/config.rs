@@ -46,6 +46,7 @@ pub struct Tile {
 #[derive(Deserialize)]
 pub struct TileSet {
     pub name: String,
+    pub tile_size: [usize; 2],
     pub tiles: Vec<Tile>,
 }
 
@@ -76,7 +77,6 @@ pub struct Shader {
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub tile_size: usize,
     pub tile_sets: Vec<TileSet>,
     pub lights: Vec<LightAnimation>,
     pub stages: Vec<Stage>,
