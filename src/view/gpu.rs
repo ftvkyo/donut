@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 
-use crate::view::{gpu_data::VertexData, window::Window};
+use crate::view::{
+    gpu_data::{TextureDepth, VertexData},
+    window::Window,
+};
 
 pub struct PipelineConfig<'s, 'g> {
     pub shader: &'s String,
@@ -14,7 +17,8 @@ pub struct PipelineExecution<'p, 'g, 'v> {
     pub vdata: &'v VertexData,
 }
 
-pub struct RenderPass<'p> {
+pub struct RenderPass<'d, 'p> {
+    pub depth: &'d wgpu::TextureView,
     pub pipelines: &'p [PipelineExecution<'p, 'p, 'p>],
 }
 
@@ -82,7 +86,13 @@ impl GPU {
                     cull_mode: Some(wgpu::Face::Back),
                     ..Default::default()
                 },
-                depth_stencil: None,
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: TextureDepth::FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
                 multisample: Default::default(),
                 multiview: None,
                 cache: None,
@@ -107,7 +117,14 @@ impl GPU {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: rpc.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });

@@ -34,7 +34,7 @@ impl Window {
     }
 
     pub fn configure(&self, gpu: &GPU) {
-        let size = self.window.inner_size();
+        let size = self.size();
 
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,

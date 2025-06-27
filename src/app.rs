@@ -69,7 +69,7 @@ impl ApplicationHandler for App {
                 view.request_redraw();
             }
             WindowEvent::Resized(_) => {
-                view.resize();
+                view.resize().unwrap();
                 // No need to re-render as the next event will be RedrawRequested
             }
             _ => (),

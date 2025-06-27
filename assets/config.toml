@@ -44,6 +44,20 @@ xxxxxxxx
 """
 z = 0.1
 
+[[stages.layers]]
+tile_name = "wall"
+tile_map = """\
+________
+________
+________
+________
+________
+________
+________
+xxxxxxxx
+"""
+z = 0.5
+
 
 [[tile_sets]]
 name = "wall"

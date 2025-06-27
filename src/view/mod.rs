@@ -15,7 +15,7 @@ use crate::{
     game::Game,
     view::{
         gpu::{PipelineConfig, PipelineExecution, RenderPass},
-        gpu_data::{TextureGroup, TextureMultiplexer, UniformGroup, VertexData},
+        gpu_data::{TextureDepth, TextureGroup, TextureMultiplexer, UniformGroup, VertexData},
     },
 };
 
@@ -25,6 +25,8 @@ pub use gpu_struct::quad::Quad;
 // Handles for the data stored on the GPU
 struct ViewGPUData {
     pub camera_uniform: UniformGroup,
+
+    pub depth: TextureDepth,
 
     pub main_tmux: TextureMultiplexer,
     // (Which texture to use, Sprites to draw)
@@ -83,6 +85,8 @@ impl View {
                 ],
             )?;
 
+            let depth = TextureDepth::new(&gpu, window.size())?;
+
             let lights_uniform = game.lights.uniform_data(&camera_view)?;
             let light_uniform =
                 UniformGroup::new(&gpu, &[bytemuck::cast_slice(&[lights_uniform])])?;
@@ -100,6 +104,8 @@ impl View {
 
             ViewGPUData {
                 camera_uniform,
+
+                depth,
 
                 main_tmux,
                 main_quads,
@@ -166,8 +172,10 @@ impl View {
         self.window.request_redraw();
     }
 
-    pub fn resize(&mut self) {
+    pub fn resize(&mut self) -> Result<()> {
         self.window.configure(&self.gpu);
+        self.gpu_data.depth = TextureDepth::new(&self.gpu, self.window.size())?;
+        Ok(())
     }
 
     pub fn update_camera(&self, game: &Game) -> Result<()> {
@@ -234,6 +242,7 @@ impl View {
         self.gpu.render(
             &self.window,
             &RenderPass {
+                depth: &self.gpu_data.depth.texture_view,
                 pipelines: &pipelines,
             },
         )
