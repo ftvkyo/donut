@@ -1,17 +1,19 @@
 use glam::{Mat4, Vec2, Vec3};
 
 pub struct Camera {
-    pub position: Vec2,
+    extent: [usize; 2],
+    position: Vec2,
 }
 
 impl Camera {
-    const FOV: f32 = std::f32::consts::FRAC_PI_2;
-    const DISTANCE: f32 = 4.0; // with PI/2, this means we see 4 tiles up and 4 tiles down
+    const DISTANCE: f32 = 20.0;
     const NEAR: f32 = 1.0;
-    const FAR: f32 = 10.0;
 
-    pub fn new(position: Vec2) -> Self {
-        Self { position }
+    pub fn new(position: Vec2, stage_dimensions: [usize; 2]) -> Self {
+        Self {
+            extent: stage_dimensions,
+            position,
+        }
     }
 
     pub fn matrix_view(&self) -> Mat4 {
@@ -20,6 +22,16 @@ impl Camera {
     }
 
     pub fn matrix_proj(&self, aspect_ratio: f32) -> Mat4 {
-        Mat4::perspective_rh(Self::FOV, aspect_ratio, Self::NEAR, Self::FAR)
+        let w = self.extent[0] as f32;
+        let h = self.extent[1] as f32;
+        // TODO: make sure the level fits when aspect ratio is different
+        Mat4::orthographic_rh(
+            -w / 2.0,
+            w / 2.0,
+            -h / 2.0,
+            h / 2.0,
+            Self::NEAR,
+            Self::DISTANCE * 2.0,
+        )
     }
 }

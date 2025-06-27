@@ -9,48 +9,66 @@ frames = 8
 
 [[stages]]
 name = "debug-01"
-size = [8, 8]
+size = [16, 9]
 
 [[stages.layers]]
 tile_name = "wall"
 tile_map = """\
-xxxxxxxx
-xxxxxxxx
-xxxxxxxx
-xxxxxxxx
-xxxxxxxx
-xxxxxxxx
-xxxxxxxx
-xxxxxxxx
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+x_x_x_x_x_x_x_x_
+"""
+z = -0.5
+
+[[stages.layers]]
+tile_name = "wall"
+tile_map = """\
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+_x_x_x_x_x_x_x_x
+"""
+z = -0.25
+
+[[stages.layers]]
+tile_name = "wall"
+tile_map = """\
+________________
+________________
+____x___________
+__________xx____
+_____x____xx____
+____xxx_________
+_____x__________
+________________
+________________
 """
 
 [[stages.layers]]
 tile_name = "wall"
 tile_map = """\
-xxxxxxxx
-x______x
-x______x
-x______x
-x______x
-x______x
-x______x
-xxxxxxxx
+xxxxxxxxxxxxxxxx
+x______________x
+x______________x
+x______________x
+x______________x
+x______________x
+x______________x
+x______________x
+xxxxxxxxxxxxxxxx
 """
-z = 0.1
-
-[[stages.layers]]
-tile_name = "wall"
-tile_map = """\
-________
-________
-________
-________
-________
-________
-________
-xxxxxxxx
-"""
-z = 0.5
+z = 1.0
 
 
 [[tile_sets]]

@@ -7,15 +7,15 @@ pub mod camera;
 pub mod light;
 
 use crate::{
-    assets::Assets,
+    assets::{Assets, Stage},
     game::{
         camera::Camera,
         light::{Light, Lights},
     },
 };
 
-pub struct Game {
-    pub stage_name: String,
+pub struct Game<'s> {
+    pub stage: &'s Stage,
 
     pub camera: Camera,
     pub lights: Lights,
@@ -23,9 +23,15 @@ pub struct Game {
     start: Instant,
 }
 
-impl Game {
-    pub fn new(assets: &Assets) -> Result<Self> {
-        let camera = Camera::new(vec2(4.0, 4.0));
+impl<'s> Game<'s> {
+    pub fn new(assets: &'s Assets) -> Result<Self> {
+        let stage_name = "debug-01";
+        let stage = assets
+            .stages
+            .get(stage_name)
+            .with_context(|| format!("No stage called '{stage_name}'?"))?;
+
+        let camera = Camera::new(vec2(0.0, 0.0), stage.size);
 
         let lights = assets
             .lights
@@ -33,7 +39,7 @@ impl Game {
             .context("No animation with the name 'fire'?")?;
 
         let mut game = Self {
-            stage_name: "debug-01".into(),
+            stage,
             camera,
             lights: Lights::new(lights.frame_count, lights.frame_size),
             start: Instant::now(),
@@ -57,7 +63,7 @@ impl Game {
         let t = ms as f32 / 1000.0;
         let b = 1.0 - (t / 3.0).min(0.9);
 
-        let origin = vec3(4.0, 4.0, 0.25);
+        let origin = vec3(0.0, 0.0, 0.25);
         let gravity = vec2(0.0, -3.0);
 
         let v0s = [
@@ -66,6 +72,8 @@ impl Game {
             vec2(0.0, 4.0),
             vec2(1.0, 3.0),
             vec2(-1.0, 3.0),
+            vec2(3.0, 2.0),
+            vec2(-3.0, 2.0),
         ];
 
         let colors = [
@@ -74,6 +82,8 @@ impl Game {
             vec4(0.1, 0.1, b, 1.0),
             vec4(0.1, b, b, 1.0),
             vec4(b, 0.1, b, 1.0),
+            vec4(b, b, 0.0, 1.0),
+            vec4(b, b, 0.0, 1.0),
         ];
 
         for (v0, color) in v0s.into_iter().zip(colors.into_iter()) {

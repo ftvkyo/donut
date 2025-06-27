@@ -45,18 +45,20 @@ impl StageLayer {
         return self.tile_map.get(&(x as usize, y as usize)).is_some();
     }
 
-    pub fn quads(&self, tile_sets: &TileSets) -> Result<Vec<Quad>> {
+    pub fn quads(&self, tile_sets: &TileSets, stage_size: [usize; 2]) -> Result<Vec<Quad>> {
         let tile_set = tile_sets
             .get(&self.tile_name)
             .with_context(|| format!("No tileset found with name {}", self.tile_name))?;
 
         let mut sprites = Vec::with_capacity(self.tile_map.len());
 
+        let offset_x = stage_size[0] as f32 / -2.0;
+        let offset_y = stage_size[1] as f32 / -2.0;
         let (w, h) = (0.5, 0.5);
         let (tex_w, tex_h) = (tile_set.tile_size[0] as f32, tile_set.tile_size[1] as f32);
 
         let sprite = |x, y, tex_x, tex_y| Quad {
-            pos: vec3(x + w / 2.0, y + h / 2.0, self.z),
+            pos: vec3(offset_x + x + w / 2.0, offset_y + y + h / 2.0, self.z),
             dim: vec2(w, h),
             rot: 0.0,
             tex_pos: vec2(tex_x as f32 * tex_w, tex_y as f32 * tex_h),
@@ -159,6 +161,7 @@ impl StageLayer {
 }
 
 pub struct Stage {
+    pub size: [usize; 2],
     pub layers: Vec<StageLayer>,
 }
 
@@ -170,6 +173,9 @@ impl From<super::config::Stage> for Stage {
             layers.push(StageLayer::from(layer));
         }
 
-        Self { layers }
+        Self {
+            size: value.size,
+            layers,
+        }
     }
 }

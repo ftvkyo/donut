@@ -67,6 +67,7 @@ pub struct StageLayer {
 #[derive(Deserialize)]
 pub struct Stage {
     pub name: String,
+    pub size: [usize; 2],
     pub layers: Vec<StageLayer>,
 }
 

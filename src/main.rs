@@ -41,7 +41,7 @@ fn run() -> Result<()> {
     let game = Game::new(&assets)?;
 
     debug!("Creating the app...");
-    let mut app = App::new(assets, game);
+    let mut app = App::new(&assets, game);
 
     debug!("Running the app...");
     event_loop.run_app(&mut app)?;

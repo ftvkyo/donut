@@ -10,14 +10,14 @@ use winit::{
 
 use crate::{assets::Assets, game::Game, view::View};
 
-pub struct App {
-    assets: Assets,
-    game: Game,
+pub struct App<'a> {
+    assets: &'a Assets,
+    game: Game<'a>,
     view: Option<View>,
 }
 
-impl App {
-    pub fn new(assets: Assets, game: Game) -> Self {
+impl<'a> App<'a> {
+    pub fn new(assets: &'a Assets, game: Game<'a>) -> Self {
         Self {
             assets,
             game,
@@ -26,7 +26,7 @@ impl App {
     }
 }
 
-impl ApplicationHandler for App {
+impl ApplicationHandler for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_size = winit::dpi::LogicalSize::new(1366, 768);
 

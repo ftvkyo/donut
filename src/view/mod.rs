@@ -59,11 +59,6 @@ impl View {
             .get(shader_name)
             .with_context(|| format!("No shader called '{shader_name}'?"))?;
 
-        let stage = assets
-            .stages
-            .get(&game.stage_name)
-            .with_context(|| format!("No stage called '{}'?", game.stage_name))?;
-
         let gpu_data = {
             let mut main_tmux = BTreeMap::new();
             for (tname, tdata) in &assets.tile_sets {
@@ -101,9 +96,9 @@ impl View {
                 VertexData::new_quads(&gpu, &game.lights.quad_data(0)?)?,
             )];
 
-            let mut main_quads = Vec::with_capacity(stage.layers.len());
-            for layer in &stage.layers {
-                let layer_quads = layer.quads(&assets.tile_sets)?;
+            let mut main_quads = Vec::with_capacity(game.stage.layers.len());
+            for layer in &game.stage.layers {
+                let layer_quads = layer.quads(&assets.tile_sets, game.stage.size)?;
                 let stage_layer = VertexData::new_quads(&gpu, &layer_quads)?;
                 main_quads.push((layer.tile_name.clone(), stage_layer));
             }
