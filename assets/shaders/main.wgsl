@@ -69,12 +69,8 @@ fn get_normal(tex_coord: vec2<f32>) -> vec3<f32> {
 }
 
 fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, tex_normal: vec3<f32>) -> vec3<f32> {
-    let ambient_strength = 0.15;
-    let specular_strength = 0.5;
+    let ambient_strength = 0.05;
     let specular_shininess = 32.0;
-    let diffuse_strength = 0.5;
-
-    let radius = 3.0;
 
     var val: vec3<f32> = vec3(ambient_strength);
 
@@ -87,7 +83,7 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, tex_normal: vec3<f32>)
 
         // Direction: Fragment -> Light
         let dir_light = normalize(light.position - frag_pos).xyz;
-        
+
         if (dot(frag_normal, dir_light) <= 0.0) {
             continue;
         }
@@ -95,7 +91,7 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, tex_normal: vec3<f32>)
         // Diffuse component:
         // - depends on the angle between the light ray and fragment normal
         // - clamped with 0 from below
-        let diffuse = diffuse_strength * max(dot(tex_normal, dir_light), 0.0);
+        let diffuse = max(dot(tex_normal, dir_light), 0.0);
 
         // Direction: Fragment -> Eye
         let dir_eye = normalize(- frag_pos).xyz;
@@ -106,12 +102,13 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, tex_normal: vec3<f32>)
         // Specular component:
         // - depends on the fragment normal, light ray and eye ray
         // - clamped with 0 from below
-        let specular = specular_strength * pow(max(dot(tex_normal, dir_halfway), 0.0), specular_shininess);
+        let specular = pow(max(dot(tex_normal, dir_halfway), 0.0), specular_shininess);
 
         // Decrease the strength of the diffuse and specular components with distance
-        let distance_factor = max(radius - length((light.position - frag_pos).xyz), 0.0);
+        let distance = length((light.position - frag_pos).xyz);
+        let distance_factor = 1 / (distance * distance);
 
-        val += light.color.rgb * distance_factor * (diffuse + specular);
+        val += light.color.rgb * light.color.a * distance_factor * (diffuse + specular);
     }
 
     return val;
