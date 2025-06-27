@@ -130,3 +130,14 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
 
     return vec4(tex_color.rgb * light, 1.0);
 }
+
+@fragment
+fn fs_light(vertex: VertexOutput) -> @location(0) vec4<f32> {
+    let tex_color = get_color(vertex.tex_coord);
+
+    if tex_color.a == 0.0 {
+        discard;
+    }
+
+    return vec4(tex_color.rgb, 1.0);
+}

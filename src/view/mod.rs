@@ -14,7 +14,7 @@ use crate::{
     assets::Assets,
     game::Game,
     view::{
-        gpu::{PipelineConfig, PipelineExecution, RenderPass},
+        gpu::{PipelineConfig, PipelineExecution, PipelineShaderConfig, RenderPass},
         gpu_data::{TextureDepth, TextureGroup, TextureMultiplexer, UniformGroup, VertexData},
     },
 };
@@ -52,6 +52,12 @@ impl View {
     pub fn new(window: Arc<winit::window::Window>, assets: &Assets, game: &Game) -> Result<Self> {
         let gpu = pollster::block_on(GPU::new())?;
         let window = Window::new(&gpu, window)?;
+
+        let shader_name = "main";
+        let shader_source = assets
+            .shaders
+            .get(shader_name)
+            .with_context(|| format!("No shader called '{shader_name}'?"))?;
 
         let stage = assets
             .stages
@@ -116,13 +122,9 @@ impl View {
             }
         };
 
-        let pipeline_main = {
-            let shader_name = "main";
-            let shader = assets
-                .shaders
-                .get(shader_name)
-                .with_context(|| format!("No shader called '{shader_name}'?"))?;
+        let shader = gpu.create_shader(shader_source);
 
+        let pipeline_main = {
             let groups = [
                 gpu_data.camera_uniform.get_bind_group_layout(),
                 gpu_data.light_uniform.get_bind_group_layout(),
@@ -130,7 +132,11 @@ impl View {
             ];
 
             let pipeline = gpu.create_pipeline(&PipelineConfig {
-                shader,
+                shader: &PipelineShaderConfig {
+                    shader: &shader,
+                    entrypoint_vertex: None,
+                    entrypoint_fragment: Some("fs_main"),
+                },
                 groups: &groups,
                 output: window.output_format(),
             });
@@ -139,19 +145,18 @@ impl View {
         };
 
         let pipeline_light = {
-            let shader_name = "light";
-            let shader = assets
-                .shaders
-                .get(shader_name)
-                .with_context(|| format!("No shader called '{shader_name}'?"))?;
-
             let groups = [
                 gpu_data.camera_uniform.get_bind_group_layout(),
+                gpu_data.light_uniform.get_bind_group_layout(),
                 gpu_data.light_tmux.get_bind_group_layout(),
             ];
 
             let pipeline = gpu.create_pipeline(&PipelineConfig {
-                shader,
+                shader: &PipelineShaderConfig {
+                    shader: &shader,
+                    entrypoint_vertex: None,
+                    entrypoint_fragment: Some("fs_light"),
+                },
                 groups: &groups,
                 output: window.output_format(),
             });
@@ -217,11 +222,13 @@ impl View {
         for (light_name, _) in &self.gpu_data.light_quads {
             gdatas_lights.push([
                 self.gpu_data.camera_uniform.get_bind_group(),
+                self.gpu_data.light_uniform.get_bind_group(),
                 self.gpu_data.light_tmux.get_bind_group(&light_name)?,
             ]);
         }
 
-        let mut pipelines = Vec::with_capacity(self.gpu_data.main_quads.len());
+        let mut pipelines =
+            Vec::with_capacity(self.gpu_data.main_quads.len() + self.gpu_data.light_quads.len());
 
         for ((_, vdata), gdata) in self.gpu_data.main_quads.iter().zip(gdatas.iter()) {
             pipelines.push(PipelineExecution {

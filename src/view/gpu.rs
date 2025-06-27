@@ -8,8 +8,14 @@ use crate::view::{
     window::Window,
 };
 
+pub struct PipelineShaderConfig<'s, 'v, 'f> {
+    pub shader: &'s wgpu::ShaderModule,
+    pub entrypoint_vertex: Option<&'v str>,
+    pub entrypoint_fragment: Option<&'f str>,
+}
+
 pub struct PipelineConfig<'s, 'g> {
-    pub shader: &'s String,
+    pub shader: &'s PipelineShaderConfig<'s, 's, 's>,
     pub groups: &'g [&'g wgpu::BindGroupLayout],
     pub output: wgpu::TextureFormat,
 }
@@ -71,14 +77,15 @@ impl GPU {
         })
     }
 
-    pub fn create_pipeline(&self, config: &PipelineConfig) -> wgpu::RenderPipeline {
-        let shader = self
-            .device
+    pub fn create_shader(&self, source: &String) -> wgpu::ShaderModule {
+        self.device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: None,
-                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(config.shader)),
-            });
+                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source)),
+            })
+    }
 
+    pub fn create_pipeline(&self, config: &PipelineConfig) -> wgpu::RenderPipeline {
         let layout = self
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -93,14 +100,14 @@ impl GPU {
                 label: None,
                 layout: Some(&layout),
                 vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: None,
+                    module: &config.shader.shader,
+                    entry_point: config.shader.entrypoint_vertex,
                     compilation_options: Default::default(),
                     buffers: &[Vertex::LAYOUT],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: None,
+                    module: &config.shader.shader,
+                    entry_point: config.shader.entrypoint_fragment,
                     compilation_options: Default::default(),
                     targets: &[Some(config.output.into())],
                 }),
