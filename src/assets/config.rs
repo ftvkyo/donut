@@ -85,7 +85,7 @@ pub struct Config {
 
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        debug!("Loading config {}...", path.as_ref().to_string_lossy());
+        debug!("Loading config '{}'...", path.as_ref().to_string_lossy());
         let config = toml::from_str(&std::fs::read_to_string(path)?)?;
         Ok(config)
     }

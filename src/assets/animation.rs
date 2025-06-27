@@ -15,10 +15,10 @@ pub struct LightAnimation {
 impl LightAnimation {
     pub fn load<P: AsRef<Path>>(value: super::config::LightAnimation, path: P) -> Result<Self> {
         let path = path.as_ref();
-        debug!("Loading light animation {}...", value.name);
+        debug!("Loading light animation '{}'...", value.name);
 
         let texture = path.join(&format!("{}.webp", value.name));
-        debug!("Loading {}...", texture.to_string_lossy());
+        debug!("Loading '{}'...", texture.to_string_lossy());
         let texture = ImageReader::open(texture)?.decode()?.into_rgba8();
 
         ensure!(texture.width() as usize % value.frames == 0);

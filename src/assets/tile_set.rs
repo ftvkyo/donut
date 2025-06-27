@@ -20,14 +20,14 @@ pub struct TileSet {
 impl TileSet {
     pub fn load<P: AsRef<Path>>(value: super::config::TileSet, path: P) -> Result<Self> {
         let path = path.as_ref();
-        debug!("Loading tile set {}...", value.name);
+        debug!("Loading tile set '{}'...", value.name);
 
         let texture_color = path.join(&format!("{}.webp", value.name));
-        debug!("Loading {}...", texture_color.to_string_lossy());
+        debug!("Loading '{}'...", texture_color.to_string_lossy());
         let texture_color = ImageReader::open(texture_color)?.decode()?.into_rgba8();
 
         let texture_normal = path.join(&format!("{}-normals.webp", value.name));
-        debug!("Loading {}...", texture_normal.to_string_lossy());
+        debug!("Loading '{}'...", texture_normal.to_string_lossy());
         let texture_normal = ImageReader::open(texture_normal)?.decode()?.into_rgba8();
 
         Ok(Self {
@@ -45,7 +45,7 @@ impl TileSet {
             .collect();
 
         if candidates.len() == 0 {
-            bail!("No tile piece with designation {designation:?}");
+            bail!("No tile piece with designation '{designation:?}'");
         }
 
         if candidates.len() == 1 {

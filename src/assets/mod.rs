@@ -39,7 +39,7 @@ pub struct Assets {
 impl Assets {
     pub fn resolve<P: AsRef<Path>>(config: config::Config, path: P) -> Result<Self> {
         debug!(
-            "Resolving config into assets at path {}",
+            "Resolving config into assets at path '{}'",
             path.as_ref().to_string_lossy()
         );
 
@@ -48,7 +48,7 @@ impl Assets {
             let name = tile_set.name.clone();
 
             if tile_sets.contains_key(&name) {
-                bail!("Tile set with the name {name} already exists");
+                bail!("Tile set with the name '{name}' already exists");
             }
 
             tile_sets.insert(
@@ -62,7 +62,7 @@ impl Assets {
             let name = light.name.clone();
 
             if lights.contains_key(&name) {
-                bail!("Animation with the name {name} already exists");
+                bail!("Animation with the name '{name}' already exists");
             }
 
             lights.insert(
@@ -76,7 +76,7 @@ impl Assets {
             let name = stage.name.clone();
 
             if stages.contains_key(&name) {
-                bail!("Stage with the name {name} already exists");
+                bail!("Stage with the name '{name}' already exists");
             }
 
             stages.insert(name, Stage::from(stage));
@@ -87,12 +87,12 @@ impl Assets {
             let name = shader.name.clone();
 
             if shaders.contains_key(&name) {
-                bail!("Shader with the name {name} already exists");
+                bail!("Shader with the name '{name}' already exists");
             }
 
             let shader_path = path.as_ref().join(format!("shaders/{}.wgsl", name));
 
-            debug!("Loading {}...", shader_path.to_string_lossy());
+            debug!("Loading '{}'...", shader_path.to_string_lossy());
             shaders.insert(name, std::fs::read_to_string(shader_path)?);
         }
 
