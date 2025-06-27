@@ -123,9 +123,12 @@ impl TextureGroup {
             depth_or_array_layers: 1,
         };
 
+        let bytes_per_row = dimensions.0 * size_of::<TexturePixel>() as u32;
+        ensure!(bytes_per_row % 256 == 0);
+
         let copy_buffer_layout = wgpu::TexelCopyBufferLayout {
             offset: 0,
-            bytes_per_row: Some(dimensions.0 * size_of::<TexturePixel>() as u32),
+            bytes_per_row: Some(bytes_per_row),
             rows_per_image: None,
         };
 
