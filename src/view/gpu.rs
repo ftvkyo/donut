@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+
+use wgpu::Features as Fs;
 
 use crate::view::{
     gpu_data::{TextureDepth, VertexData},
@@ -31,14 +33,33 @@ pub struct GPU {
 }
 
 impl GPU {
+    /// Features to request from the adapter
+    // https://docs.rs/wgpu/latest/wgpu/struct.Features.html
+    const FEATURES: &[wgpu::Features] = &[
+        // Fs::PUSH_CONSTANTS,
+        // Fs::TEXTURE_BINDING_ARRAY,
+    ];
+
     pub async fn new() -> Result<Self> {
         let instance = wgpu::Instance::new(&Default::default());
         let adapter = instance
             .request_adapter(&Default::default())
             .await
             .context("Failed to acquire an adapter")?;
+
+        let required_features = Self::FEATURES.iter().copied().fold(Fs::empty(), Fs::union);
+        let adapter_features = adapter.features();
+        let missing_features = required_features.difference(adapter_features);
+
+        if !missing_features.is_empty() {
+            bail!("The adapter is missing the following features: {missing_features}");
+        }
+
         let (device, queue) = adapter
-            .request_device(&Default::default())
+            .request_device(&wgpu::wgt::DeviceDescriptor {
+                required_features,
+                ..Default::default()
+            })
             .await
             .context("Failed to acquire a device")?;
 
