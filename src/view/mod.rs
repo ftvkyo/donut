@@ -49,19 +49,20 @@ pub struct View {
 }
 
 impl View {
-    pub fn new(window: Arc<winit::window::Window>, assets: &Assets, game: &Game) -> Result<Self> {
+    pub fn new(window: Arc<winit::window::Window>, game: &Game) -> Result<Self> {
         let gpu = pollster::block_on(GPU::new())?;
         let window = Window::new(&gpu, window)?;
 
         let shader_name = "main";
-        let shader_source = assets
+        let shader_source = game
+            .assets
             .shaders
             .get(shader_name)
             .with_context(|| format!("No shader called '{shader_name}'?"))?;
 
         let gpu_data = {
             let mut main_tmux = BTreeMap::new();
-            for (tname, tdata) in &assets.tile_sets {
+            for (tname, tdata) in &game.assets.maps {
                 let tgroup =
                     TextureGroup::new(&gpu, &[&tdata.texture_color, &tdata.texture_normal])?;
                 main_tmux.insert(tname.clone(), tgroup);
@@ -69,7 +70,7 @@ impl View {
             let main_tmux = TextureMultiplexer::new(&gpu, main_tmux)?;
 
             let mut light_tmux = BTreeMap::new();
-            for (tname, tdata) in &assets.lights {
+            for (tname, tdata) in &game.assets.lights {
                 let tgroup = TextureGroup::new(&gpu, &[&tdata.texture])?;
                 light_tmux.insert(tname.clone(), tgroup);
             }

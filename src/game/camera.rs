@@ -1,7 +1,7 @@
 use glam::{Mat4, Vec2, Vec3};
 
 pub struct Camera {
-    extent: [usize; 2],
+    map_size: [u32; 2],
     position: Vec2,
 }
 
@@ -9,9 +9,9 @@ impl Camera {
     const DISTANCE: f32 = 20.0;
     const NEAR: f32 = 1.0;
 
-    pub fn new(position: Vec2, stage_dimensions: [usize; 2]) -> Self {
+    pub fn new(position: Vec2, map_size: [u32; 2]) -> Self {
         Self {
-            extent: stage_dimensions,
+            map_size,
             position,
         }
     }
@@ -22,8 +22,8 @@ impl Camera {
     }
 
     pub fn matrix_proj(&self, aspect_ratio: f32) -> Mat4 {
-        let w = self.extent[0] as f32;
-        let h = self.extent[1] as f32;
+        let w = self.map_size[0] as f32;
+        let h = self.map_size[1] as f32;
         // TODO: make sure the level fits when aspect ratio is different
         Mat4::orthographic_rh(
             -w / 2.0,

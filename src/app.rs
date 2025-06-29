@@ -8,25 +8,23 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::{assets::Assets, game::Game, view::View};
+use crate::{game::Game, view::View};
 
-pub struct App<'a> {
-    assets: &'a Assets,
-    game: Game<'a>,
+pub struct App {
+    game: Game,
     view: Option<View>,
 }
 
-impl<'a> App<'a> {
-    pub fn new(assets: &'a Assets, game: Game<'a>) -> Self {
+impl App {
+    pub fn new(game: Game) -> Self {
         Self {
-            assets,
             game,
             view: None,
         }
     }
 }
 
-impl ApplicationHandler for App<'_> {
+impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_size = winit::dpi::LogicalSize::new(1366, 768);
 
@@ -41,7 +39,7 @@ impl ApplicationHandler for App<'_> {
         );
 
         let view =
-            View::new(window.clone(), &self.assets, &self.game).expect("Could not create the view");
+            View::new(window.clone(), &self.game).expect("Could not create the view");
 
         self.view = Some(view);
 

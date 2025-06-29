@@ -7,15 +7,15 @@ pub mod camera;
 pub mod light;
 
 use crate::{
-    assets::{Assets, Stage},
+    assets::Assets,
     game::{
         camera::Camera,
         light::{Light, Lights},
     },
 };
 
-pub struct Game<'s> {
-    pub stage: &'s Stage,
+pub struct Game {
+    pub assets: Assets,
 
     pub camera: Camera,
     pub lights: Lights,
@@ -23,25 +23,28 @@ pub struct Game<'s> {
     start: Instant,
 }
 
-impl<'s> Game<'s> {
-    pub fn new(assets: &'s Assets) -> Result<Self> {
-        let stage_name = "debug-01";
-        let stage = assets
-            .stages
-            .get(stage_name)
-            .with_context(|| format!("No stage called '{stage_name}'?"))?;
+impl Game {
+    pub fn new(assets: Assets) -> Result<Self> {
+        let map_name = "debug-01";
+        let map = assets
+            .maps
+            .get(map_name)
+            .with_context(|| format!("No map called '{map_name}'?"))?;
 
-        let camera = Camera::new(vec2(0.0, 0.0), stage.size);
+        let map_size = [map.width * map.tile_width, map.height * map.tile_height];
+
+        let camera = Camera::new(vec2(0.0, 0.0), map_size);
 
         let lights = assets
             .lights
             .get("fire")
             .context("No animation with the name 'fire'?")?;
+        let lights = Lights::new(lights.frame_count, lights.frame_size);
 
         let mut game = Self {
-            stage,
+            assets,
             camera,
-            lights: Lights::new(lights.frame_count, lights.frame_size),
+            lights,
             start: Instant::now(),
         };
         game.set_lights_at(0);

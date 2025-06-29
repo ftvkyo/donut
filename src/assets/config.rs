@@ -1,53 +1,12 @@
-use std::{ops::Deref, path::Path};
+use std::path::Path;
 
 use anyhow::Result;
-use enumset::{EnumSet, EnumSetType};
 use log::debug;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 
 #[derive(Deserialize)]
-pub struct TileWeight(f32);
-
-impl Default for TileWeight {
-    fn default() -> Self {
-        Self(1.0)
-    }
-}
-
-impl Deref for TileWeight {
-    type Target = f32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Debug, EnumSetType, Serialize, Deserialize)]
-#[enumset(serialize_repr = "list")]
-#[serde(rename_all = "lowercase")]
-pub enum TileDesignation {
-    Top,
-    Right,
-    Bottom,
-    Left,
-    Inner,
-}
-
-#[derive(Deserialize)]
-pub struct Tile {
-    pub x: usize,
-    pub y: usize,
-    #[serde(default)]
-    pub is: EnumSet<TileDesignation>,
-    #[serde(default)]
-    pub weight: TileWeight,
-}
-
-#[derive(Deserialize)]
-pub struct TileSet {
+pub struct Shader {
     pub name: String,
-    pub tile_size: [usize; 2],
-    pub tiles: Vec<Tile>,
 }
 
 #[derive(Deserialize)]
@@ -57,31 +16,15 @@ pub struct LightAnimation {
 }
 
 #[derive(Deserialize)]
-pub struct StageLayer {
-    pub tile_name: String,
-    pub tile_map: String,
-    #[serde(default)]
-    pub z: f32,
-}
-
-#[derive(Deserialize)]
-pub struct Stage {
-    pub name: String,
-    pub size: [usize; 2],
-    pub layers: Vec<StageLayer>,
-}
-
-#[derive(Deserialize)]
-pub struct Shader {
+pub struct Map {
     pub name: String,
 }
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub tile_sets: Vec<TileSet>,
     pub lights: Vec<LightAnimation>,
-    pub stages: Vec<Stage>,
     pub shaders: Vec<Shader>,
+    pub maps: Vec<Map>,
 }
 
 impl Config {
