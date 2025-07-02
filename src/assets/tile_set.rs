@@ -12,8 +12,9 @@ pub type TexturePixel = Rgba<u8>;
 pub type TextureData = ImageBuffer<TexturePixel, Vec<u8>>;
 
 pub struct TileSet {
-    tiles: Vec<super::Tile>,
+    pub name: String,
     pub tile_size: [usize; 2],
+    tiles: Vec<super::Tile>,
     pub texture_color: TextureData,
     pub texture_normal: TextureData,
 }
@@ -32,6 +33,7 @@ impl TileSet {
         let texture_normal = ImageReader::open(texture_normal)?.decode()?.into_rgba8();
 
         Ok(Self {
+            name: value.name,
             tile_size: value.tile_size,
             tiles: value.tiles,
             texture_color,

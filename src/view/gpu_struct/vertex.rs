@@ -7,6 +7,7 @@ use bytemuck::{Pod, Zeroable};
 pub struct Vertex {
     pub pos: [f32; 4],
     pub normal: [f32; 3],
+    pub tex_num: u32,
     pub tex_coord: [f32; 2],
 }
 
@@ -30,9 +31,14 @@ impl Vertex {
                 shader_location: 1,
             },
             wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Uint32,
+                offset: offset_of!(Vertex, tex_num) as u64,
+                shader_location: 2,
+            },
+            wgpu::VertexAttribute {
                 format: wgpu::VertexFormat::Float32x2,
                 offset: offset_of!(Vertex, tex_coord) as u64,
-                shader_location: 2,
+                shader_location: 3,
             },
         ],
     };

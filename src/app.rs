@@ -12,12 +12,12 @@ use crate::{assets::Assets, game::Game, view::View};
 
 pub struct App<'a> {
     assets: &'a Assets,
-    game: Game<'a>,
+    game: Game,
     view: Option<View>,
 }
 
 impl<'a> App<'a> {
-    pub fn new(assets: &'a Assets, game: Game<'a>) -> Self {
+    pub fn new(assets: &'a Assets, game: Game) -> Self {
         Self {
             assets,
             game,

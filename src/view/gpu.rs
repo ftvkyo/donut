@@ -42,8 +42,8 @@ impl GPU {
     /// Features to request from the adapter
     // https://docs.rs/wgpu/latest/wgpu/struct.Features.html
     const FEATURES: &[wgpu::Features] = &[
-        // Fs::PUSH_CONSTANTS,
-        // Fs::TEXTURE_BINDING_ARRAY,
+        Fs::TEXTURE_BINDING_ARRAY,
+        Fs::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
     ];
 
     pub async fn new() -> Result<Self> {
@@ -61,9 +61,13 @@ impl GPU {
             bail!("The adapter is missing the following features: {missing_features}");
         }
 
+        let mut required_limits = wgpu::Limits::default();
+        required_limits.max_binding_array_elements_per_shader_stage = 4;
+
         let (device, queue) = adapter
             .request_device(&wgpu::wgt::DeviceDescriptor {
                 required_features,
+                required_limits,
                 ..Default::default()
             })
             .await

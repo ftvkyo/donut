@@ -3,9 +3,9 @@ mod gpu_data;
 mod gpu_struct;
 mod window;
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use gpu::GPU;
 use window::Window;
@@ -30,12 +30,12 @@ struct ViewGPUData {
 
     pub main_tmux: TextureMultiplexer,
     // (Which texture to use, Sprites to draw)
-    pub main_quads: Vec<(String, VertexData)>,
+    pub main_quads: Vec<VertexData>,
 
     pub light_tmux: TextureMultiplexer,
     pub light_uniform: UniformGroup,
     // (Which animation to use, Sprites to draw)
-    pub light_quads: Vec<(String, VertexData)>,
+    pub light_quads: Vec<VertexData>,
 }
 
 pub struct View {
@@ -54,24 +54,21 @@ impl View {
         let window = Window::new(&gpu, window)?;
 
         let shader_name = "main";
-        let shader_source = assets
-            .shaders
-            .get(shader_name)
-            .with_context(|| format!("No shader called '{shader_name}'?"))?;
+        let shader_source = assets.find_shader(shader_name)?;
 
         let gpu_data = {
-            let mut main_tmux = BTreeMap::new();
-            for (tname, tdata) in &assets.tile_sets {
+            let mut main_tmux = Vec::new();
+            for (_, tdata) in assets.all_tile_sets() {
                 let tgroup =
                     TextureGroup::new(&gpu, &[&tdata.texture_color, &tdata.texture_normal])?;
-                main_tmux.insert(tname.clone(), tgroup);
+                main_tmux.push(tgroup);
             }
             let main_tmux = TextureMultiplexer::new(&gpu, main_tmux)?;
 
-            let mut light_tmux = BTreeMap::new();
-            for (tname, tdata) in &assets.lights {
+            let mut light_tmux = Vec::new();
+            for (_, tdata) in assets.all_lights() {
                 let tgroup = TextureGroup::new(&gpu, &[&tdata.texture])?;
-                light_tmux.insert(tname.clone(), tgroup);
+                light_tmux.push(tgroup);
             }
             let light_tmux = TextureMultiplexer::new(&gpu, light_tmux)?;
 
@@ -88,20 +85,18 @@ impl View {
 
             let depth = TextureDepth::new(&gpu, window.size())?;
 
+            let stage = assets.get_stage(game.stage_num).unwrap();
+            let mut main_quads = Vec::with_capacity(stage.layers.len());
+            for stage_layer in &stage.layers {
+                let layer_quads = stage_layer.quads(&assets, stage.size)?;
+                let stage_layer = VertexData::new_quads(&gpu, &layer_quads)?;
+                main_quads.push(stage_layer);
+            }
+
             let lights_uniform = game.lights.uniform_data(&camera_view)?;
             let light_uniform =
                 UniformGroup::new(&gpu, &[bytemuck::cast_slice(&[lights_uniform])])?;
-            let light_quads = vec![(
-                "fire".to_string(),
-                VertexData::new_quads(&gpu, &game.lights.quad_data(0)?)?,
-            )];
-
-            let mut main_quads = Vec::with_capacity(game.stage.layers.len());
-            for layer in &game.stage.layers {
-                let layer_quads = layer.quads(&assets.tile_sets, game.stage.size)?;
-                let stage_layer = VertexData::new_quads(&gpu, &layer_quads)?;
-                main_quads.push((layer.tile_name.clone(), stage_layer));
-            }
+            let light_quads = vec![VertexData::new_quads(&gpu, &game.lights.quad_data(0)?)?];
 
             ViewGPUData {
                 camera_uniform,
@@ -196,47 +191,39 @@ impl View {
 
         let frame = (game.elapsed().as_millis() * 60 / 1000 / 10) as usize;
         let lights_quads = game.lights.quad_data(frame % game.lights.frame_count)?;
-        self.gpu_data.light_quads[0]
-            .1
-            .update_quads(&self.gpu, &lights_quads)?;
+        self.gpu_data.light_quads[0].update_quads(&self.gpu, &lights_quads)?;
 
         Ok(())
     }
 
     pub fn render(&self) -> Result<()> {
-        let mut gdatas = Vec::with_capacity(self.gpu_data.main_quads.len());
-        for (texture_name, _) in &self.gpu_data.main_quads {
-            gdatas.push([
-                self.gpu_data.camera_uniform.get_bind_group(),
-                self.gpu_data.light_uniform.get_bind_group(),
-                self.gpu_data.main_tmux.get_bind_group(&texture_name)?,
-            ]);
-        }
-
-        let mut gdatas_lights = Vec::with_capacity(self.gpu_data.light_quads.len());
-        for (light_name, _) in &self.gpu_data.light_quads {
-            gdatas_lights.push([
-                self.gpu_data.camera_uniform.get_bind_group(),
-                self.gpu_data.light_uniform.get_bind_group(),
-                self.gpu_data.light_tmux.get_bind_group(&light_name)?,
-            ]);
-        }
-
         let mut pipelines =
             Vec::with_capacity(self.gpu_data.main_quads.len() + self.gpu_data.light_quads.len());
 
-        for ((_, vdata), gdata) in self.gpu_data.main_quads.iter().zip(gdatas.iter()) {
+        let gdata_main = [
+            self.gpu_data.camera_uniform.get_bind_group(),
+            self.gpu_data.light_uniform.get_bind_group(),
+            self.gpu_data.main_tmux.get_bind_group(),
+        ];
+
+        for vdata in &self.gpu_data.main_quads {
             pipelines.push(PipelineExecution {
                 pipeline: &self.pipeline_main,
-                gdata,
+                gdata: &gdata_main,
                 vdata,
             })
         }
 
-        for ((_, vdata), gdata) in self.gpu_data.light_quads.iter().zip(gdatas_lights.iter()) {
+        let gdata_light = [
+            self.gpu_data.camera_uniform.get_bind_group(),
+            self.gpu_data.light_uniform.get_bind_group(),
+            self.gpu_data.light_tmux.get_bind_group(),
+        ];
+
+        for vdata in &self.gpu_data.light_quads {
             pipelines.push(PipelineExecution {
                 pipeline: &self.pipeline_light,
-                gdata,
+                gdata: &gdata_light,
                 vdata,
             })
         }

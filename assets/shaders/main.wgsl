@@ -1,14 +1,16 @@
 struct VertexInput {
     @location(0) position: vec4<f32>,
     @location(1) normal: vec3<f32>,
-    @location(2) tex_coord: vec2<f32>,
+    @location(2) tex_num: u32,
+    @location(3) tex_coord: vec2<f32>,
 }
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) frag_pos: vec4<f32>,
     @location(1) frag_normal: vec3<f32>,
-    @location(2) tex_coord: vec2<f32>,
+    @location(2) tex_num: u32,
+    @location(3) tex_coord: vec2<f32>,
 };
 
 @group(0) @binding(0)
@@ -23,6 +25,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     result.position = proj * view * vertex.position;
     result.frag_pos = view * vertex.position;
     result.frag_normal = vertex.normal;
+    result.tex_num = vertex.tex_num;
     result.tex_coord = vertex.tex_coord;
 
     return result;
@@ -39,21 +42,19 @@ struct Light {
 @group(1) @binding(0)
 var<uniform> lights: array<Light, LIGHT_COUNT>;
 
-// Texture color
 @group(2) @binding(0)
-var texture_color: texture_2d<f32>;
+var tex_color: binding_array<texture_2d<f32>>;
 
-// Texture normal in Model coordinate space
 @group(2) @binding(1)
-var texture_normal: texture_2d<f32>;
+var tex_normal: binding_array<texture_2d<f32>>;
 
-fn get_color(tex_coord: vec2<f32>) -> vec4<f32> {
-    return textureLoad(texture_color, vec2<i32>(tex_coord), 0);
+fn get_color(tex_num: u32, tex_coord: vec2<f32>) -> vec4<f32> {
+    return textureLoad(tex_color[tex_num], vec2<i32>(tex_coord), 0);
 }
 
-fn get_normal(tex_coord: vec2<f32>) -> vec3<f32> {
+fn get_normal(tex_num: u32, tex_coord: vec2<f32>) -> vec3<f32> {
     // x, y, z in range [0.0, 1.0], model coordinate space
-    let model_tex = textureLoad(texture_normal, vec2<i32>(tex_coord), 0).xyz;
+    let model_tex = textureLoad(tex_normal[tex_num], vec2<i32>(tex_coord), 0).xyz;
     // x, y, z in range [-1.0, 1.0], length = 1.0, model coordinate space
     let model_dir = normalize(model_tex - vec3(0.5));
 
@@ -116,8 +117,8 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, tex_normal: vec3<f32>)
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let tex_color = get_color(vertex.tex_coord);
-    let tex_normal = get_normal(vertex.tex_coord);
+    let tex_color = get_color(vertex.tex_num, vertex.tex_coord);
+    let tex_normal = get_normal(vertex.tex_num, vertex.tex_coord);
 
     if tex_color.a == 0.0 {
         discard;
@@ -130,7 +131,7 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_light(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let tex_color = get_color(vertex.tex_coord);
+    let tex_color = get_color(vertex.tex_num, vertex.tex_coord);
 
     if tex_color.a == 0.0 {
         discard;

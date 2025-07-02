@@ -15,14 +15,16 @@ pub struct Light {
 
 pub struct Lights {
     pub inner: Vec<Light>,
+    pub tex_num: u32,
     pub frame_count: usize,
     pub frame_size: [usize; 2],
 }
 
 impl Lights {
-    pub fn new(frame_count: usize, frame_size: [usize; 2]) -> Self {
+    pub fn new(tex_num: u32, frame_count: usize, frame_size: [usize; 2]) -> Self {
         Self {
             inner: Vec::with_capacity(UNIFORM_LIGHTS),
+            tex_num,
             frame_count,
             frame_size,
         }
@@ -56,6 +58,7 @@ impl Lights {
                 pos: light.position.truncate(),
                 dim: vec2(1.0, 1.0),
                 rot: light.rotation,
+                tex_num: self.tex_num,
                 tex_pos: vec2(frame_w * frame, 0.0),
                 tex_dim: vec2(frame_w, frame_h),
             });

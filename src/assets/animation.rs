@@ -7,6 +7,7 @@ use log::debug;
 use crate::assets::TextureData;
 
 pub struct LightAnimation {
+    pub name: String,
     pub frame_size: [usize; 2],
     pub frame_count: usize,
     pub texture: TextureData,
@@ -24,6 +25,7 @@ impl LightAnimation {
         ensure!(texture.width() as usize % value.frames == 0);
 
         Ok(Self {
+            name: value.name,
             frame_size: [
                 texture.width() as usize / value.frames,
                 texture.height() as usize,

@@ -15,6 +15,8 @@ pub struct Quad {
     // TODO: account for rotation in light calculation (normal map is not rotated)
     pub rot: f32,
 
+    /// Which texture to use
+    pub tex_num: u32,
     /// Position of the top-left corner of the corresponding texture quad
     pub tex_pos: Vec2,
     /// Width and Height of the corresponding texture quad
@@ -24,6 +26,7 @@ pub struct Quad {
 impl Quad {
     pub fn vertex_data(&self) -> [Vertex; 4] {
         let normal = [0.0, 0.0, 1.0];
+        let tex_num = self.tex_num;
 
         let w2 = self.dim.x / 2.0;
         let h2 = self.dim.y / 2.0;
@@ -46,21 +49,25 @@ impl Quad {
             Vertex {
                 pos: vpos[0].into(),
                 normal,
+                tex_num,
                 tex_coord: tpos[0].into(),
             },
             Vertex {
                 pos: vpos[1].into(),
                 normal,
+                tex_num,
                 tex_coord: tpos[1].into(),
             },
             Vertex {
                 pos: vpos[2].into(),
                 normal,
+                tex_num,
                 tex_coord: tpos[2].into(),
             },
             Vertex {
                 pos: vpos[3].into(),
                 normal,
+                tex_num,
                 tex_coord: tpos[3].into(),
             },
         ]

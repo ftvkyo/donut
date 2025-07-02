@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use anyhow::{Context, Result, ensure};
 
 use crate::{
@@ -8,89 +6,87 @@ use crate::{
 };
 
 pub struct TextureMultiplexer {
-    layout: wgpu::BindGroupLayout,
-    groups: BTreeMap<String, (wgpu::BindGroup, TextureGroup)>,
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+    groups: Vec<TextureGroup>,
 }
 
 impl TextureMultiplexer {
-    pub fn new(gpu: &GPU, texture_groups: BTreeMap<String, TextureGroup>) -> Result<Self> {
-        let (_, first) = texture_groups
-            .first_key_value()
+    pub fn new(gpu: &GPU, groups: Vec<TextureGroup>) -> Result<Self> {
+        let first = groups
+            .first()
             .context("at least one texture group is expected")?;
 
         let textures_per_group = first.textures.len();
-        for (_, tg) in texture_groups.iter() {
+        for g in groups.iter() {
             ensure!(
-                textures_per_group == tg.textures.len(),
+                textures_per_group == g.textures.len(),
                 "all texture groups should have the same number of textures"
             );
         }
 
-        let make_layout_entry = |index| wgpu::BindGroupLayoutEntry {
-            binding: index,
+        let count = Some((groups.len() as u32).try_into()?);
+
+        let make_layout_entry = |binding| wgpu::BindGroupLayoutEntry {
+            binding,
             visibility: wgpu::ShaderStages::FRAGMENT,
             ty: wgpu::BindingType::Texture {
                 multisampled: false,
                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 view_dimension: wgpu::TextureViewDimension::D2,
             },
-            count: None,
+            count,
         };
 
         let layout_entries: Vec<_> = (0..textures_per_group as u32)
             .map(make_layout_entry)
             .collect();
 
-        let layout = gpu
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &layout_entries,
-            });
+        let bind_group_layout =
+            gpu.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &layout_entries,
+                });
 
-        let mut groups = BTreeMap::new();
-
-        for (name, texture_group) in texture_groups {
-            let group_entries: Vec<_> = texture_group
-                .textures
-                .iter()
-                .enumerate()
-                .map(|(index, (_, view))| wgpu::BindGroupEntry {
-                    binding: index as u32,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                })
-                .collect();
-
-            let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: None,
-                layout: &layout,
-                entries: &group_entries,
-            });
-
-            groups.insert(name, (bind_group, texture_group));
+        let mut texture_view_groups = vec![vec![]; textures_per_group];
+        for group in &groups {
+            for (itexture, (_, texture_view)) in group.textures.iter().enumerate() {
+                texture_view_groups[itexture].push(texture_view);
+            }
         }
 
-        Ok(Self { layout, groups })
+        let mut entries = Vec::new();
+        for (i, texture_view_group) in texture_view_groups.iter().enumerate() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: i as u32,
+                resource: wgpu::BindingResource::TextureViewArray(texture_view_group),
+            });
+        }
+
+        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &entries,
+        });
+
+        Ok(Self {
+            bind_group_layout,
+            bind_group,
+            groups,
+        })
     }
 
     pub fn get_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.layout
+        &self.bind_group_layout
     }
 
-    pub fn get_bind_group(&self, name: &String) -> Result<&wgpu::BindGroup> {
-        let group = self
-            .groups
-            .get(name)
-            .with_context(|| format!("No bind group with name '{name}'?"))?;
-        Ok(&group.0)
+    pub fn get_bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
     }
 
-    pub fn get_texture_group(&self, name: &String) -> Result<&TextureGroup> {
-        let group = self
-            .groups
-            .get(name)
-            .with_context(|| format!("No texture group with name '{name}'?"))?;
-        Ok(&group.1)
+    pub fn get_texture_group(&self, index: usize) -> Option<&TextureGroup> {
+        self.groups.get(index)
     }
 }
 

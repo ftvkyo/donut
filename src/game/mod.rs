@@ -1,21 +1,21 @@
 use std::time::Instant;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use glam::{vec2, vec3, vec4};
 
 pub mod camera;
 pub mod light;
 
 use crate::{
-    assets::{Assets, Stage},
+    assets::Assets,
     game::{
         camera::Camera,
         light::{Light, Lights},
     },
 };
 
-pub struct Game<'s> {
-    pub stage: &'s Stage,
+pub struct Game {
+    pub stage_num: usize,
 
     pub camera: Camera,
     pub lights: Lights,
@@ -23,25 +23,20 @@ pub struct Game<'s> {
     start: Instant,
 }
 
-impl<'s> Game<'s> {
-    pub fn new(assets: &'s Assets) -> Result<Self> {
+impl Game {
+    pub fn new(assets: &Assets) -> Result<Self> {
         let stage_name = "debug-01";
-        let stage = assets
-            .stages
-            .get(stage_name)
-            .with_context(|| format!("No stage called '{stage_name}'?"))?;
+        let (stage_num, stage) = assets.find_stage(stage_name)?;
 
         let camera = Camera::new(vec2(0.0, 0.0), stage.size);
 
-        let lights = assets
-            .lights
-            .get("fire")
-            .context("No animation with the name 'fire'?")?;
+        let light_name = "fire";
+        let (ilight, light) = assets.find_light(light_name)?;
 
         let mut game = Self {
-            stage,
+            stage_num,
             camera,
-            lights: Lights::new(lights.frame_count, lights.frame_size),
+            lights: Lights::new(ilight as u32, light.frame_count, light.frame_size),
             start: Instant::now(),
         };
         game.set_lights_at(0);
