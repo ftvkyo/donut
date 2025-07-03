@@ -1,7 +1,7 @@
 use glam::{Mat4, Vec2, Vec3};
 
 pub struct Camera {
-    extent: [usize; 2],
+    extent: [u32; 2],
     position: Vec2,
 }
 
@@ -9,9 +9,9 @@ impl Camera {
     const DISTANCE: f32 = 20.0;
     const NEAR: f32 = 1.0;
 
-    pub fn new(position: Vec2, stage_dimensions: [usize; 2]) -> Self {
+    pub fn new(position: Vec2, map_dimensions: [u32; 2]) -> Self {
         Self {
-            extent: stage_dimensions,
+            extent: map_dimensions,
             position,
         }
     }

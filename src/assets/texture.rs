@@ -4,7 +4,8 @@ use anyhow::{Result, ensure};
 use image::ImageReader;
 use log::debug;
 
-use crate::assets::TextureData;
+pub type TexturePixel = image::Rgba<u8>;
+pub type TextureData = image::ImageBuffer<TexturePixel, Vec<u8>>;
 
 pub struct LightAnimation {
     pub name: String,

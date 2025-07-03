@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct Game {
-    pub stage_num: usize,
+    pub map_num: usize,
 
     pub camera: Camera,
     pub lights: Lights,
@@ -25,16 +25,16 @@ pub struct Game {
 
 impl Game {
     pub fn new(assets: &Assets) -> Result<Self> {
-        let stage_name = "debug-01";
-        let (stage_num, stage) = assets.find_stage(stage_name)?;
+        let map_name = "debug-01";
+        let (map_num, map) = assets.find_map(map_name)?;
 
-        let camera = Camera::new(vec2(0.0, 0.0), stage.size);
+        let camera = Camera::new(vec2(0.0, 0.0), map.size_tiles());
 
         let light_name = "fire";
         let (ilight, light) = assets.find_light(light_name)?;
 
         let mut game = Self {
-            stage_num,
+            map_num,
             camera,
             lights: Lights::new(ilight as u32, light.frame_count, light.frame_size),
             start: Instant::now(),

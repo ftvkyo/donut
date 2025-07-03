@@ -1,105 +1,80 @@
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::path::Path;
 
-use anyhow::Context;
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use log::debug;
 
-mod animation;
 mod config;
-mod stage;
-mod tile_set;
-
-pub use animation::LightAnimation;
+mod map;
+mod texture;
+mod tileset;
 
 pub use config::Config;
-pub use config::Tile;
-pub use config::TileDesignation;
-pub use config::TileWeight;
-
-pub use stage::Stage;
-pub use stage::StageLayer;
-
-pub use tile_set::TextureData;
-pub use tile_set::TexturePixel;
-pub use tile_set::TileSet;
+pub use map::Map;
+pub use texture::LightAnimation;
+pub use texture::TextureData;
+pub use texture::TexturePixel;
+pub use tileset::Tileset;
+pub use tileset::TilesetId;
 
 pub struct Assets {
-    tile_sets: Vec<TileSet>,
     lights: Vec<LightAnimation>,
-    stages: Vec<Stage>,
     shaders: BTreeMap<String, String>,
+
+    maps: Vec<Map>,
+    tilesets: Vec<Tileset>,
+
+    tiled_loader: tiled::Loader,
 }
 
 impl Assets {
+    fn empty() -> Self {
+        Self {
+            lights: Vec::new(),
+            shaders: BTreeMap::new(),
+
+            maps: Vec::new(),
+            tilesets: Vec::new(),
+
+            tiled_loader: tiled::Loader::new(),
+        }
+    }
+
     pub fn resolve<P: AsRef<Path>>(config: config::Config, path: P) -> Result<Self> {
+        let path = path.as_ref();
+
         debug!(
             "Resolving config into assets at path '{}'",
-            path.as_ref().to_string_lossy()
+            path.to_string_lossy()
         );
 
-        let mut s = Self {
-            tile_sets: Vec::with_capacity(config.tile_sets.len()),
-            lights: Vec::with_capacity(config.lights.len()),
-            stages: Vec::with_capacity(config.stages.len()),
-            shaders: BTreeMap::new(),
-        };
+        let mut s = Self::empty();
 
-        for tile_set in config.tile_sets {
-            s.add_tile_set(tile_set, path.as_ref().join("textures"))?;
-        }
-
+        let path_lights = path.join("textures");
         for light in config.lights {
-            s.add_light(light, path.as_ref().join("textures"))?;
+            s.load_light(light, &path_lights)?;
         }
 
-        for stage in config.stages {
-            s.add_stage(stage)?;
-        }
-
+        let path_shaders = path.join("shaders");
         for shader in config.shaders {
-            s.add_shader(shader, path.as_ref().join("shaders"))?;
+            s.load_shader(shader, &path_shaders)?;
+        }
+
+        let path_maps = path.join("maps");
+        let path_maps_extension = OsStr::new("tmx");
+        for entry in std::fs::read_dir(path_maps)? {
+            let entry = entry?;
+            let entry_path = entry.path();
+            if entry_path.is_file() && entry_path.extension() == Some(path_maps_extension) {
+                s.load_map(entry_path)?;
+            }
         }
 
         Ok(s)
     }
 
-    fn add_tile_set(&mut self, tile_set: config::TileSet, path: impl AsRef<Path>) -> Result<()> {
-        if self.find_tile_set(&tile_set.name).is_ok() {
-            bail!("Tile set with the name '{}' already exists", tile_set.name);
-        }
-
-        let tile_set = TileSet::load(tile_set, path)?;
-        self.tile_sets.push(tile_set);
-
-        Ok(())
-    }
-
-    pub fn find_tile_set(&self, name: &str) -> Result<(usize, &TileSet)> {
-        self.tile_sets
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.name == name)
-            .with_context(|| format!("No tile set '{name}'"))
-    }
-
-    pub fn get_tile_set(&self, index: usize) -> Option<&TileSet> {
-        self.tile_sets.get(index)
-    }
-
-    pub fn all_tile_sets(&self) -> impl Iterator<Item = (usize, &TileSet)> {
-        self.tile_sets.iter().enumerate()
-    }
-
-    pub fn find_light(&self, name: &str) -> Result<(usize, &LightAnimation)> {
-        self.lights
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.name == name)
-            .with_context(|| format!("No light animation '{name}'"))
-    }
-
-    fn add_light(&mut self, light: config::LightAnimation, path: impl AsRef<Path>) -> Result<()> {
+    fn load_light(&mut self, light: config::LightAnimation, path: impl AsRef<Path>) -> Result<()> {
         if self.find_light(&light.name).is_ok() {
             bail!(
                 "Light animation with the name '{}' already exists",
@@ -113,6 +88,14 @@ impl Assets {
         Ok(())
     }
 
+    pub fn find_light(&self, name: &str) -> Result<(usize, &LightAnimation)> {
+        self.lights
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.name == name)
+            .with_context(|| format!("No light animation '{name}'"))
+    }
+
     pub fn get_light(&self, index: usize) -> Option<&LightAnimation> {
         self.lights.get(index)
     }
@@ -121,36 +104,7 @@ impl Assets {
         self.lights.iter().enumerate()
     }
 
-    pub fn find_stage(&self, name: &str) -> Result<(usize, &Stage)> {
-        self.stages
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.name == name)
-            .with_context(|| format!("No stage '{name}'"))
-    }
-
-    pub fn get_stage(&self, index: usize) -> Option<&Stage> {
-        self.stages.get(index)
-    }
-
-    fn add_stage(&mut self, stage: config::Stage) -> Result<()> {
-        if self.find_stage(&stage.name).is_ok() {
-            bail!("Stage with the name '{}' already exists", stage.name);
-        }
-
-        let stage = Stage::new(&self, stage)?;
-        self.stages.push(stage);
-
-        Ok(())
-    }
-
-    pub fn find_shader(&self, name: &str) -> Result<&String> {
-        self.shaders
-            .get(name)
-            .with_context(|| format!("No shader '{name}'"))
-    }
-
-    fn add_shader(&mut self, shader: config::Shader, path: impl AsRef<Path>) -> Result<()> {
+    fn load_shader(&mut self, shader: config::Shader, path: impl AsRef<Path>) -> Result<()> {
         if self.find_shader(&shader.name).is_ok() {
             bail!("Shader with the name '{}' already exists", shader.name);
         }
@@ -161,5 +115,56 @@ impl Assets {
             .insert(shader.name, std::fs::read_to_string(shader_path)?);
 
         Ok(())
+    }
+
+    pub fn find_shader(&self, name: &str) -> Result<&String> {
+        self.shaders
+            .get(name)
+            .with_context(|| format!("No shader '{name}'"))
+    }
+
+    pub fn load_map(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        let path = path.as_ref();
+        debug!("Loading map '{}'", path.to_string_lossy());
+
+        let map = self.tiled_loader.load_tmx_map(&path)?;
+        let mut tileset_map = Vec::new();
+
+        for tileset in map.tilesets() {
+            let tileset_id = TilesetId::new(tileset);
+            match self
+                .tilesets
+                .iter()
+                .enumerate()
+                .find(|(_, t)| tileset_id == t.id())
+            {
+                Some((i, _)) => tileset_map.push(i),
+                None => {
+                    let tileset = Tileset::load_for_map(tileset)?;
+                    self.tilesets.push(tileset);
+                    tileset_map.push(self.tilesets.len() - 1);
+                }
+            }
+        }
+
+        self.maps.push(Map::new(map, tileset_map)?);
+
+        Ok(())
+    }
+
+    pub fn find_map(&self, name: &str) -> Result<(usize, &Map)> {
+        self.maps
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.name == name)
+            .with_context(|| format!("No map '{name}'"))
+    }
+
+    pub fn get_map(&self, index: usize) -> Option<&Map> {
+        self.maps.get(index)
+    }
+
+    pub fn all_tilesets(&self) -> impl Iterator<Item = (usize, &Tileset)> {
+        self.tilesets.iter().enumerate()
     }
 }

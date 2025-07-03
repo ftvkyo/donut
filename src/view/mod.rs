@@ -29,13 +29,11 @@ struct ViewGPUData {
     pub depth: TextureDepth,
 
     pub main_tmux: TextureMultiplexer,
-    // (Which texture to use, Sprites to draw)
-    pub main_quads: Vec<VertexData>,
+    pub main_quads: VertexData,
 
     pub light_tmux: TextureMultiplexer,
     pub light_uniform: UniformGroup,
-    // (Which animation to use, Sprites to draw)
-    pub light_quads: Vec<VertexData>,
+    pub light_quads: VertexData,
 }
 
 pub struct View {
@@ -58,7 +56,7 @@ impl View {
 
         let gpu_data = {
             let mut main_tmux = Vec::new();
-            for (_, tdata) in assets.all_tile_sets() {
+            for (_, tdata) in assets.all_tilesets() {
                 let tgroup =
                     TextureGroup::new(&gpu, &[&tdata.texture_color, &tdata.texture_normal])?;
                 main_tmux.push(tgroup);
@@ -85,18 +83,13 @@ impl View {
 
             let depth = TextureDepth::new(&gpu, window.size())?;
 
-            let stage = assets.get_stage(game.stage_num).unwrap();
-            let mut main_quads = Vec::with_capacity(stage.layers.len());
-            for stage_layer in &stage.layers {
-                let layer_quads = stage_layer.quads(&assets, stage.size)?;
-                let stage_layer = VertexData::new_quads(&gpu, &layer_quads)?;
-                main_quads.push(stage_layer);
-            }
+            let map = assets.get_map(game.map_num).unwrap();
+            let main_quads = VertexData::new_quads(&gpu, &map.quads()?)?;
 
             let lights_uniform = game.lights.uniform_data(&camera_view)?;
             let light_uniform =
                 UniformGroup::new(&gpu, &[bytemuck::cast_slice(&[lights_uniform])])?;
-            let light_quads = vec![VertexData::new_quads(&gpu, &game.lights.quad_data(0)?)?];
+            let light_quads = VertexData::new_quads(&gpu, &game.lights.quad_data(0)?)?;
 
             ViewGPUData {
                 camera_uniform,
@@ -191,28 +184,19 @@ impl View {
 
         let frame = (game.elapsed().as_millis() * 60 / 1000 / 10) as usize;
         let lights_quads = game.lights.quad_data(frame % game.lights.frame_count)?;
-        self.gpu_data.light_quads[0].update_quads(&self.gpu, &lights_quads)?;
+        self.gpu_data
+            .light_quads
+            .update_quads(&self.gpu, &lights_quads)?;
 
         Ok(())
     }
 
     pub fn render(&self) -> Result<()> {
-        let mut pipelines =
-            Vec::with_capacity(self.gpu_data.main_quads.len() + self.gpu_data.light_quads.len());
-
         let gdata_main = [
             self.gpu_data.camera_uniform.get_bind_group(),
             self.gpu_data.light_uniform.get_bind_group(),
             self.gpu_data.main_tmux.get_bind_group(),
         ];
-
-        for vdata in &self.gpu_data.main_quads {
-            pipelines.push(PipelineExecution {
-                pipeline: &self.pipeline_main,
-                gdata: &gdata_main,
-                vdata,
-            })
-        }
 
         let gdata_light = [
             self.gpu_data.camera_uniform.get_bind_group(),
@@ -220,13 +204,18 @@ impl View {
             self.gpu_data.light_tmux.get_bind_group(),
         ];
 
-        for vdata in &self.gpu_data.light_quads {
-            pipelines.push(PipelineExecution {
+        let pipelines = [
+            PipelineExecution {
+                pipeline: &self.pipeline_main,
+                gdata: &gdata_main,
+                vdata: &self.gpu_data.main_quads,
+            },
+            PipelineExecution {
                 pipeline: &self.pipeline_light,
                 gdata: &gdata_light,
-                vdata,
-            })
-        }
+                vdata: &self.gpu_data.light_quads,
+            },
+        ];
 
         self.gpu.render(
             &self.window,
