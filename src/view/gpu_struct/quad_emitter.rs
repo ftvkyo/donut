@@ -1,16 +1,15 @@
 use glam::{Vec2, Vec3, vec2};
 
-use crate::view::gpu_struct::vertex::Vertex;
+use crate::view::gpu_struct::vertex::VertexEmitter;
 use crate::view::gpu_struct::vertex::VertexIndex;
 
-pub struct Quad {
+pub struct QuadEmitter {
     /// Position of the center of the quad
     pub pos: Vec3,
     /// Width and Height of the quad
     pub dim: Vec2,
     /// Rotation of the quad around the Z axis.
     /// Positive values correspond to clockwise rotation.
-    // TODO: account for rotation in light calculation (normal map is not rotated)
     pub rot: f32,
 
     /// Which texture to use
@@ -19,10 +18,13 @@ pub struct Quad {
     pub tex_pos: Vec2,
     /// Width and Height of the corresponding texture quad
     pub tex_dim: Vec2,
+
+    /// Tint
+    pub tint: Vec3,
 }
 
-impl Quad {
-    pub fn vertex_data(&self) -> [Vertex; 4] {
+impl QuadEmitter {
+    pub fn vertex_data(&self) -> [VertexEmitter; 4] {
         let tex_num = self.tex_num;
 
         let w2 = self.dim.x / 2.0;
@@ -42,24 +44,30 @@ impl Quad {
         let tpos = [vec2(0.0, th), vec2(tw, th), vec2(tw, 0.0), vec2(0.0, 0.0)]
             .map(|offset| self.tex_pos + offset);
 
+        let tint = self.tint.extend(1.0).into();
+
         [
-            Vertex {
+            VertexEmitter {
                 pos: vpos[0].into(),
+                tint,
                 tex_num,
                 tex_coord: tpos[0].into(),
             },
-            Vertex {
+            VertexEmitter {
                 pos: vpos[1].into(),
+                tint,
                 tex_num,
                 tex_coord: tpos[1].into(),
             },
-            Vertex {
+            VertexEmitter {
                 pos: vpos[2].into(),
+                tint,
                 tex_num,
                 tex_coord: tpos[2].into(),
             },
-            Vertex {
+            VertexEmitter {
                 pos: vpos[3].into(),
+                tint,
                 tex_num,
                 tex_coord: tpos[3].into(),
             },

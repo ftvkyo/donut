@@ -1,10 +1,9 @@
 use anyhow::{Result, ensure};
-use bytemuck::Zeroable;
-use glam::{Mat4, Vec4, vec2};
+use glam::{Vec4, Vec4Swizzles, vec2};
 
-use crate::view::{
-    Quad,
-    light::{UNIFORM_LIGHTS, UniformLight, UniformLights},
+use crate::{
+    assets::Map,
+    view::{DeferredLight, QuadEmitter},
 };
 
 pub struct Light {
@@ -23,28 +22,27 @@ pub struct Lights {
 impl Lights {
     pub fn new(tex_num: u32, frame_count: usize, frame_size: [usize; 2]) -> Self {
         Self {
-            inner: Vec::with_capacity(UNIFORM_LIGHTS),
+            inner: Vec::new(),
             tex_num,
             frame_count,
             frame_size,
         }
     }
 
-    pub fn uniform_data(&self, view: &Mat4) -> Result<UniformLights> {
-        ensure!(self.inner.len() <= UNIFORM_LIGHTS);
-
-        let mut uniform = UniformLights::zeroed();
-        for (index, light) in self.inner.iter().enumerate() {
-            uniform.0[index] = UniformLight {
-                position: *view * light.position,
+    pub fn deferred_data(&self, map: &Map) -> Result<Vec<DeferredLight>> {
+        let mut lights = Vec::with_capacity(self.inner.len());
+        for light in &self.inner {
+            let visibility = map.visibility_for(light.position.xy().into()).segments;
+            lights.push(DeferredLight {
+                position: light.position,
                 color: light.color,
-            };
+                visibility,
+            });
         }
-
-        Ok(uniform)
+        Ok(lights)
     }
 
-    pub fn quad_data(&self, frame: usize) -> Result<Vec<Quad>> {
+    pub fn quad_data(&self, frame: usize) -> Result<Vec<QuadEmitter>> {
         ensure!(frame < self.frame_count);
 
         let mut quads = Vec::with_capacity(self.inner.len());
@@ -54,13 +52,14 @@ impl Lights {
         let frame_h = self.frame_size[1] as f32;
 
         for light in self.inner.iter() {
-            quads.push(Quad {
+            quads.push(QuadEmitter {
                 pos: light.position.truncate(),
                 dim: vec2(1.0, 1.0),
                 rot: light.rotation,
                 tex_num: self.tex_num,
                 tex_pos: vec2(frame_w * frame, 0.0),
                 tex_dim: vec2(frame_w, frame_h),
+                tint: light.color.truncate(),
             });
         }
 

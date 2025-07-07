@@ -3,42 +3,36 @@ use wgpu::util::DeviceExt;
 
 use crate::view::gpu::GPU;
 
-pub struct UniformGroup {
+pub struct UniformGroup<const BINDINGS: usize> {
     layout: wgpu::BindGroupLayout,
     group: wgpu::BindGroup,
-    buffers: Vec<wgpu::Buffer>,
+    buffers: [wgpu::Buffer; BINDINGS],
 }
 
-impl UniformGroup {
-    pub fn new(gpu: &GPU, uniforms: &[&[u8]]) -> Result<Self> {
+impl<const BINDINGS: usize> UniformGroup<BINDINGS> {
+    pub fn new(gpu: &GPU, uniforms: &[&[u8]; BINDINGS]) -> Result<Self> {
         ensure!(uniforms.len() > 0, "at least one uniform is expected");
 
-        let mut buffers = Vec::with_capacity(uniforms.len());
-        let mut layout_entries = Vec::with_capacity(uniforms.len());
-
-        for (index, data) in uniforms.iter().enumerate() {
-            let buffer = gpu
-                .device
+        let buffers = std::array::from_fn(|index| {
+            gpu.device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: None,
-                    contents: data,
+                    contents: uniforms[index],
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                });
+                })
+        });
 
-            let layout_entry = wgpu::BindGroupLayoutEntry {
+        let layout_entries =
+            std::array::from_fn::<_, BINDINGS, _>(|index| wgpu::BindGroupLayoutEntry {
                 binding: index as u32,
                 visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(data.len() as u64),
+                    min_binding_size: wgpu::BufferSize::new(uniforms[index].len() as u64),
                 },
                 count: None,
-            };
-
-            buffers.push(buffer);
-            layout_entries.push(layout_entry);
-        }
+            });
 
         let layout = gpu
             .device
@@ -47,14 +41,10 @@ impl UniformGroup {
                 entries: &layout_entries,
             });
 
-        let mut group_entries = Vec::with_capacity(uniforms.len());
-
-        for (index, buffer) in buffers.iter().enumerate() {
-            group_entries.push(wgpu::BindGroupEntry {
-                binding: index as u32,
-                resource: buffer.as_entire_binding(),
-            });
-        }
+        let group_entries = std::array::from_fn::<_, BINDINGS, _>(|index| wgpu::BindGroupEntry {
+            binding: index as u32,
+            resource: buffers[index].as_entire_binding(),
+        });
 
         let group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -69,7 +59,7 @@ impl UniformGroup {
         })
     }
 
-    pub fn update(&self, gpu: &GPU, uniforms: &[&[u8]]) -> Result<()> {
+    pub fn update(&self, gpu: &GPU, uniforms: &[&[u8]; BINDINGS]) -> Result<()> {
         ensure!(uniforms.len() == self.buffers.len());
 
         for (data, buffer) in uniforms.iter().zip(self.buffers.iter()) {

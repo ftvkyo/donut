@@ -27,6 +27,9 @@
 </data>
  </layer>
  <layer id="1" name="Foreground" width="32" height="18">
+  <properties>
+   <property name="Occluding" type="bool" value="true"/>
+  </properties>
   <data encoding="csv">
 34,34,34,34,34,34,34,34,34,34,34,34,34,34,35,0,0,33,34,34,34,34,34,34,34,34,34,34,34,34,34,34,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

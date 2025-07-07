@@ -2,33 +2,26 @@ use anyhow::{Context, Result, bail};
 
 use wgpu::Features as Fs;
 
-use crate::view::{
-    gpu_data::{TextureDepth, VertexData},
-    gpu_struct::vertex::Vertex,
-    window::Window,
-};
+use crate::view::gpu_data::VertexData;
 
-pub struct PipelineShaderConfig<'s, 'v, 'f> {
+pub struct PipelineConfig<'s, 'v, 'g, 'o> {
+    pub label: &'static str,
     pub shader: &'s wgpu::ShaderModule,
-    pub entrypoint_vertex: Option<&'v str>,
-    pub entrypoint_fragment: Option<&'f str>,
-}
-
-pub struct PipelineConfig<'s, 'g> {
-    pub shader: &'s PipelineShaderConfig<'s, 's, 's>,
     pub groups: &'g [&'g wgpu::BindGroupLayout],
-    pub output: wgpu::TextureFormat,
+    pub targets: &'o [wgpu::ColorTargetState],
+    pub depth_stencil: Option<wgpu::DepthStencilState>,
+    pub vertex_layout: wgpu::VertexBufferLayout<'v>,
 }
 
-pub struct PipelineExecution<'p, 'g, 'v> {
-    pub pipeline: &'p wgpu::RenderPipeline,
-    pub gdata: &'g [&'g wgpu::BindGroup],
-    pub vdata: &'v VertexData,
+pub struct RenderPass<'desc, 'pip, 'gdat, 'vdat> {
+    pub descriptor: &'desc wgpu::RenderPassDescriptor<'desc>,
+    pub pipeline: &'pip wgpu::RenderPipeline,
+    pub gdata: &'gdat [&'gdat wgpu::BindGroup],
+    pub vdata: &'vdat dyn VertexData,
 }
 
-pub struct RenderPass<'d, 'p> {
-    pub depth: &'d wgpu::TextureView,
-    pub pipelines: &'p [PipelineExecution<'p, 'p, 'p>],
+pub struct RenderConfig<'p> {
+    pub passes: &'p [&'p RenderPass<'p, 'p, 'p, 'p>],
 }
 
 pub struct GPU {
@@ -81,15 +74,15 @@ impl GPU {
         })
     }
 
-    pub fn create_shader(&self, source: &String) -> wgpu::ShaderModule {
+    pub fn create_shader(&self, name: &str, source: &String) -> wgpu::ShaderModule {
         self.device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
+                label: Some(name),
                 source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source)),
             })
     }
 
-    pub fn create_pipeline(&self, config: &PipelineConfig) -> wgpu::RenderPipeline {
+    pub fn create_pipeline(&self, config: PipelineConfig) -> wgpu::RenderPipeline {
         let layout = self
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -98,34 +91,31 @@ impl GPU {
                 push_constant_ranges: &[],
             });
 
+        let targets: Vec<_> = config
+            .targets
+            .into_iter()
+            .map(|target| Some(target.clone()))
+            .collect();
+
         let pipeline = self
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: None,
+                label: Some(config.label),
                 layout: Some(&layout),
                 vertex: wgpu::VertexState {
-                    module: &config.shader.shader,
-                    entry_point: config.shader.entrypoint_vertex,
+                    module: &config.shader,
+                    entry_point: None,
                     compilation_options: Default::default(),
-                    buffers: &[Vertex::LAYOUT],
+                    buffers: &[config.vertex_layout],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &config.shader.shader,
-                    entry_point: config.shader.entrypoint_fragment,
+                    module: &config.shader,
+                    entry_point: None,
                     compilation_options: Default::default(),
-                    targets: &[Some(config.output.into())],
+                    targets: &targets,
                 }),
-                primitive: wgpu::PrimitiveState {
-                    cull_mode: Some(wgpu::Face::Back),
-                    ..Default::default()
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: TextureDepth::FORMAT,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: Default::default(),
-                    bias: Default::default(),
-                }),
+                depth_stencil: config.depth_stencil,
+                primitive: Default::default(),
                 multisample: Default::default(),
                 multiview: None,
                 cache: None,
@@ -134,55 +124,27 @@ impl GPU {
         pipeline
     }
 
-    pub fn render(&self, window: &Window, rpc: &RenderPass) -> Result<()> {
-        let (surface_texture, surface_view) = window.texture()?;
-
+    pub fn render(&self, config: &RenderConfig) -> Result<()> {
         let mut encoder = self.device.create_command_encoder(&Default::default());
 
-        {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &surface_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: rpc.depth,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+        for &pass in config.passes {
+            let mut rpass = encoder.begin_render_pass(pass.descriptor);
 
-            for pconfig in rpc.pipelines {
-                rpass.set_pipeline(&pconfig.pipeline);
-
-                for (index, group) in pconfig.gdata.iter().enumerate() {
-                    rpass.set_bind_group(index as u32, *group, &[]);
-                }
-
-                rpass.set_vertex_buffer(0, pconfig.vdata.get_vertex_buffer().slice(..));
-                rpass.set_index_buffer(
-                    pconfig.vdata.get_index_buffer().slice(..),
-                    Vertex::INDEX_FORMAT,
-                );
-
-                rpass.draw_indexed(0..pconfig.vdata.get_index_count(), 0, 0..1);
+            rpass.set_pipeline(&pass.pipeline);
+            for (index, group) in pass.gdata.iter().enumerate() {
+                rpass.set_bind_group(index as u32, *group, &[]);
             }
+
+            rpass.set_vertex_buffer(0, pass.vdata.get_vertex_buffer().slice(..));
+            rpass.set_index_buffer(
+                pass.vdata.get_index_buffer().slice(..),
+                pass.vdata.get_index_format(),
+            );
+
+            rpass.draw_indexed(0..pass.vdata.get_index_count(), 0, 0..1);
         }
 
         self.queue.submit([encoder.finish()]);
-
-        window.pre_present_notify();
-        surface_texture.present();
 
         Ok(())
     }

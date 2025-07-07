@@ -1,5 +1,11 @@
 [[shaders]]
-name = "main"
+name = "prepare"
+
+[[shaders]]
+name = "deferred"
+
+[[shaders]]
+name = "emitters"
 
 [[lights]]
 name = "fire"

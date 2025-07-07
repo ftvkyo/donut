@@ -1,13 +1,16 @@
 use anyhow::{Context, Result, bail, ensure};
 use glam::{vec2, vec3};
 
-use crate::view::Quad;
+use crate::{
+    game::geo::{Point, Segment, VisibilityPolygon},
+    view::Quad,
+};
 
-#[derive(Debug)]
 pub struct Map {
     pub name: String,
     inner: tiled::Map,
     tileset_map: Vec<usize>,
+    occlusion_segments: Vec<Segment>,
 }
 
 impl Map {
@@ -22,11 +25,15 @@ impl Map {
 
         ensure!(inner.orientation == tiled::Orientation::Orthogonal);
 
-        Ok(Self {
+        let mut s = Self {
             name,
             inner,
             tileset_map,
-        })
+            occlusion_segments: Vec::new(),
+        };
+        s.recalculate_occlusion_segments()?;
+
+        Ok(s)
     }
 
     pub fn size_tiles(&self) -> [u32; 2] {
@@ -108,5 +115,102 @@ impl Map {
                 }
             })
         })
+    }
+
+    fn recalculate_occlusion_segments(&mut self) -> Result<()> {
+        let map_w2 = self.inner.width as f32 / 2.0;
+        let map_h2 = self.inner.height as f32 / 2.0;
+
+        for layer in self.inner.layers() {
+            let occluding = match layer.properties.get("Occluding") {
+                Some(tiled::PropertyValue::BoolValue(val)) => *val,
+                _ => false,
+            };
+
+            if !occluding {
+                continue;
+            }
+
+            let layer = layer
+                .as_tile_layer()
+                .context("Only tile layers are supported")?;
+
+            let layer = match layer {
+                tiled::TileLayer::Finite(layer) => layer,
+                _ => bail!("Only finite tile layers are supported"),
+            };
+
+            let layer_w = layer.width() as i32;
+            let layer_h = layer.height() as i32;
+
+            let is_solid = |x: i32, y: i32| {
+                let x = x.clamp(0, layer_w);
+                let y = y.clamp(0, layer_h);
+                layer.get_tile(x, y).is_some()
+            };
+
+            self.occlusion_segments.clear();
+
+            for x in 0..layer_w {
+                for y in 0..layer_h {
+                    if !is_solid(x, y) {
+                        continue;
+                    }
+
+                    let empty_up = !is_solid(x, y - 1);
+                    let empty_right = !is_solid(x + 1, y);
+                    let empty_down = !is_solid(x, y + 1);
+                    let empty_left = !is_solid(x - 1, y);
+
+                    let (x, y) = (x as f32 - map_w2, (layer_h - 1 - y) as f32 - map_h2);
+
+                    if empty_up {
+                        self.occlusion_segments
+                            .push(Segment::new((x, y + 1.0), (x + 1.0, y + 1.0)).unwrap());
+                    }
+
+                    if empty_right {
+                        self.occlusion_segments
+                            .push(Segment::new((x + 1.0, y), (x + 1.0, y + 1.0)).unwrap());
+                    }
+
+                    if empty_down {
+                        self.occlusion_segments
+                            .push(Segment::new((x, y), (x + 1.0, y)).unwrap());
+                    }
+
+                    if empty_left {
+                        self.occlusion_segments
+                            .push(Segment::new((x, y), (x, y + 1.0)).unwrap());
+                    }
+                }
+            }
+        }
+
+        // Also add map edges
+
+        let (map_w2, map_h2) = (map_w2 + 1.0, map_h2 + 1.0);
+
+        // Top edge
+        self.occlusion_segments
+            .push(Segment::new((-map_w2, map_h2), (map_w2, map_h2)).unwrap());
+
+        // Right edge
+        self.occlusion_segments
+            .push(Segment::new((map_w2, map_h2), (map_w2, -map_h2)).unwrap());
+
+        // Bottom edge
+        self.occlusion_segments
+            .push(Segment::new((map_w2, -map_h2), (-map_w2, -map_h2)).unwrap());
+
+        // Left edge
+        self.occlusion_segments
+            .push(Segment::new((-map_w2, -map_h2), (-map_w2, map_h2)).unwrap());
+
+        Ok(())
+    }
+
+    pub fn visibility_for(&self, point: Point) -> VisibilityPolygon {
+        VisibilityPolygon::compute(point, &self.occlusion_segments)
     }
 }

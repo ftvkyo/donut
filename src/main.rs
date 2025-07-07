@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(dead_code))]
+
 use anyhow::Result;
 use log::{debug, error, info};
 
@@ -10,22 +12,10 @@ use crate::{
 mod app;
 mod assets;
 mod game;
+mod logging;
 mod view;
 
-fn init_logging() {
-    use log::LevelFilter;
-
-    let level = if cfg!(debug_assertions) {
-        LevelFilter::Debug
-    } else {
-        LevelFilter::Info
-    };
-
-    env_logger::builder()
-        .filter_module(module_path!(), level)
-        .parse_default_env()
-        .init();
-}
+pub use logging::init_logging;
 
 fn run() -> Result<()> {
     use winit::event_loop::{ControlFlow, EventLoop};
