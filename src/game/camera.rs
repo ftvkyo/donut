@@ -21,10 +21,10 @@ impl Camera {
         Mat4::look_to_rh(position, Vec3::NEG_Z, Vec3::Y)
     }
 
-    pub fn matrix_proj(&self, aspect_ratio: f32) -> Mat4 {
+    pub fn matrix_proj(&self, _aspect_ratio: f32) -> Mat4 {
+        // TODO: make sure the level fits when aspect ratio is different
         let w = self.extent[0] as f32;
         let h = self.extent[1] as f32;
-        // TODO: make sure the level fits when aspect ratio is different
         Mat4::orthographic_rh(
             -w / 2.0,
             w / 2.0,
