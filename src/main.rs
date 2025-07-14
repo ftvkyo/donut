@@ -1,5 +1,7 @@
 #![cfg_attr(test, allow(dead_code))]
 
+use std::path::Path;
+
 use anyhow::Result;
 use log::{debug, error, info};
 
@@ -20,8 +22,11 @@ pub use logging::init_logging;
 fn run() -> Result<()> {
     use winit::event_loop::{ControlFlow, EventLoop};
 
-    let config = Config::load("assets/config.toml")?;
-    let assets = Assets::resolve(config, "assets")?;
+    let dir_cargo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let dir_assets = dir_cargo.join("assets");
+
+    let config = Config::load(dir_assets.join("config.toml"))?;
+    let assets = Assets::resolve(config, dir_assets)?;
 
     debug!("Creating event loop...");
     let event_loop = EventLoop::new()?;
