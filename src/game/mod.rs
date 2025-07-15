@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Result;
 use glam::{Vec3, vec2, vec3};
+use palette::{FromColor, LinSrgb, OklabHue, Oklch};
 
 pub mod camera;
 pub mod geo;
@@ -18,25 +19,7 @@ use crate::{
     },
 };
 
-const LIGHT_COUNT: usize = 16;
-const LIGHT_COLORS: [Vec3; LIGHT_COUNT] = [
-    vec3(1.0, 0.1, 0.1),
-    vec3(0.1, 1.0, 0.1),
-    vec3(0.1, 0.1, 1.0),
-    vec3(0.1, 1.0, 1.0),
-    vec3(1.0, 0.1, 1.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(1.0, 0.1, 0.1),
-    vec3(0.1, 1.0, 0.1),
-    vec3(0.1, 0.1, 1.0),
-    vec3(0.1, 1.0, 1.0),
-    vec3(1.0, 0.1, 1.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(1.0, 1.0, 1.0),
-    vec3(1.0, 1.0, 1.0),
-];
+const LIGHT_COUNT: usize = 12;
 
 pub struct Game<'m> {
     pub map: &'m Map,
@@ -80,10 +63,11 @@ impl<'a> Game<'a> {
     fn set_lights_at(&mut self, ms: u128) {
         self.lights.inner = Vec::with_capacity(LIGHT_COUNT);
 
-        let t = ms as f32 / 1000.0;
-        let b = 1.0 - (t / 5.0).min(0.9);
+        let time = ms as f32 / 1000.0;
+        // let brightness = 1.0 - (time / 5.0).min(0.9);
+        let brightness = 2.5;
 
-        let origin = vec3(0.0, 0.0, 0.25);
+        let origin = vec3(0.0, 0.0, 1.0);
         let gravity = vec2(0.0, -3.0);
 
         let v0 = 9.0;
@@ -96,16 +80,25 @@ impl<'a> Game<'a> {
                     * (1.0 - light_i as f32 / (LIGHT_COUNT - 1).max(1) as f32);
             let (angle_sin, angle_cos) = angle.sin_cos();
             let v0 = vec2(angle_cos, angle_sin) * v0;
-            let color = LIGHT_COLORS[light_i].extend(b);
 
-            let pos = origin + v0.extend(0.0) * t + gravity.extend(0.0) * t * t;
-            let vel = v0 + 2.0 * gravity * t;
+            let ok_hue = OklabHue::new(360.0 / (LIGHT_COUNT - 1) as f32 * light_i as f32);
+            let ok_color = Oklch {
+                l: 0.7,
+                chroma: 0.2,
+                hue: ok_hue,
+            };
+            let lsrgb_color = LinSrgb::from_color(ok_color);
+            let color: [f32; 3] = lsrgb_color.into();
+            let color: Vec3 = color.into();
 
-            let rotation = vel.y.atan2(vel.x);
+            let position = origin + v0.extend(0.0) * time + gravity.extend(0.0) * time * time;
+
+            let velocity = v0 + 2.0 * gravity * time;
+            let rotation = velocity.y.atan2(velocity.x);
 
             self.lights.inner.push(Light {
-                position: pos.extend(1.0),
-                color,
+                position: position.extend(1.0),
+                color: color.extend(brightness),
                 rotation,
             });
         }
