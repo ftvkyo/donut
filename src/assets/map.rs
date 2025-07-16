@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail, ensure};
 use glam::{vec2, vec3};
+use winit::dpi::{LogicalSize, PhysicalSize};
 
 use crate::{
     game::geo::{Point, Segment, VisibilityPolygon},
@@ -36,8 +37,11 @@ impl Map {
         Ok(s)
     }
 
-    pub fn size_tiles(&self) -> [u32; 2] {
-        [self.inner.width, self.inner.height]
+    pub fn size_tiles(&self) -> LogicalSize<u32> {
+        LogicalSize {
+            width: self.inner.width,
+            height: self.inner.height,
+        }
     }
 
     pub fn quads(&self) -> Result<Vec<Quad>> {

@@ -72,7 +72,7 @@ impl View {
             let map_quads = VertexBuffers::new_quads(&gpu, &game.map.quads()?)?;
 
             let camera_view = game.camera.matrix_view();
-            let camera_proj = game.camera.matrix_proj(window.aspect_ratio());
+            let camera_proj = game.camera.matrix_proj(window.size());
 
             let camera = UniformGroup::new(
                 &gpu,
@@ -230,6 +230,7 @@ impl View {
         self.window.configure(&self.gpu);
 
         self.gpu_data.depth.update(&self.gpu, self.window.size())?;
+
         self.gpu_data
             .deferred_textures
             .update(&self.gpu, self.window.size())?;
@@ -247,7 +248,7 @@ impl View {
 
     pub fn update_camera(&self, game: &Game) -> Result<()> {
         let camera_view = game.camera.matrix_view();
-        let camera_proj = game.camera.matrix_proj(self.window.aspect_ratio());
+        let camera_proj = game.camera.matrix_proj(self.window.size());
 
         self.gpu_data.camera.update(
             &self.gpu,

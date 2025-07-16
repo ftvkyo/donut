@@ -70,11 +70,6 @@ impl Window {
         self.window.inner_size()
     }
 
-    pub fn aspect_ratio(&self) -> f32 {
-        let size = self.size();
-        size.width as f32 / size.height as f32
-    }
-
     pub fn output_format(&self) -> wgpu::TextureFormat {
         self.surface_view_format
     }

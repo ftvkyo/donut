@@ -70,6 +70,7 @@ impl ApplicationHandler for App<'_> {
             }
             WindowEvent::Resized(_) => {
                 view.resize().unwrap();
+                view.update_camera(&self.game).unwrap();
                 // No need to re-render as the next event will be RedrawRequested
             }
             _ => (),
