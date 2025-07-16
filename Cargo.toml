@@ -10,7 +10,7 @@ bytemuck = "1.23.0"
 env_logger = { version = "0.11.8", default-features = false, features = ["auto-color", "humantime"] }
 glam = { version = "0.30.3", features = ["bytemuck"] }
 image = { version = "0.25.6", default-features = false, features = ["webp"] }
-log = "0.4.27"
+log = { version = "0.4.27", features = ["release_max_level_info"] }
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
 pollster = "0.4.0"
 rand = { version = "0.9.1", default-features = false, features = ["alloc", "thread_rng"] }
