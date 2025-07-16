@@ -4,29 +4,41 @@ use std::{
 };
 
 use anyhow::Result;
-use glam::{Vec3, vec2, vec3};
+use glam::{Vec3, Vec4, vec2};
 use palette::{FromColor, LinSrgb, OklabHue, Oklch};
 
 pub mod camera;
-pub mod light;
 
 use crate::{
-    assets::{Assets, Map},
-    game::{
-        camera::Camera,
-        light::{LightCollection, LightObject},
+    assets::{Assets, LightSource, Map, Shape},
+    game::camera::Camera,
+    geo::{Point, ToricGeometry},
+    phys::{
+        Physics,
+        object::{PhysObject, SceneObject},
     },
+    view::{DeferredLight, QuadEmitter},
 };
 
 const LIGHT_COUNT: usize = 12;
 
+pub enum GameObject<'assets> {
+    Light {
+        color: Vec4,
+        light_id: u32,
+        light_asset: &'assets LightSource,
+    },
+}
+
 pub struct Game<'assets> {
     pub map: &'assets Map,
-
     pub camera: Camera,
-    pub lights: LightCollection<'assets>,
+
+    physics: Physics<GameObject<'assets>>,
+    physics_scene: Vec<SceneObject>,
 
     start: Instant,
+    last_advance: Instant,
 }
 
 impl<'assets> Game<'assets> {
@@ -37,48 +49,31 @@ impl<'assets> Game<'assets> {
         let camera = Camera::new(vec2(0.0, 0.0), map.size_tiles());
 
         let light_name = "fire";
-        let (light_id, light) = assets.find_light(light_name)?;
+        let (light_id, light_asset) = assets.find_light(light_name)?;
 
-        let mut game = Self {
-            map,
-            camera,
-            lights: LightCollection::new(light_id as u32, light),
-            start: Instant::now(),
-        };
-        game.set_lights_at(0);
+        let map_size = map.size_tiles();
+        let mut physics = Physics::new(
+            assets.max_timestep,
+            ToricGeometry {
+                x: map_size.width as f32,
+                y: map_size.height as f32,
+            },
+        );
 
-        Ok(game)
-    }
-
-    pub fn elapsed(&self) -> std::time::Duration {
-        self.start.elapsed()
-    }
-
-    pub fn advance(&mut self) {
-        // self.set_lights_at(self.elapsed().as_millis() % 4_000);
-        self.set_lights_at(1500);
-    }
-
-    fn set_lights_at(&mut self, ms: u128) {
-        self.lights.objects = Vec::with_capacity(LIGHT_COUNT);
-
-        let time = ms as f32 / 1000.0;
-        // let brightness = 1.0 - (time / 5.0).min(0.9);
-        let brightness = 2.5;
-
-        let origin = vec3(0.0, 0.0, 1.0);
-        let gravity = vec2(0.0, -3.0);
-
-        let v0 = 9.0;
-        let angle_start = FRAC_PI_8;
-        let angle_end = PI - FRAC_PI_8;
+        let light_brightness = 2.5;
+        let light_angle_start = FRAC_PI_8;
+        let light_angle_end = PI - FRAC_PI_8;
 
         for light_i in 0..LIGHT_COUNT {
-            let angle = angle_start
-                + (angle_end - angle_start)
+            let angle = light_angle_start
+                + (light_angle_end - light_angle_start)
                     * (1.0 - light_i as f32 / (LIGHT_COUNT - 1).max(1) as f32);
             let (angle_sin, angle_cos) = angle.sin_cos();
-            let v0 = vec2(angle_cos, angle_sin) * v0;
+            let v0 = vec2(angle_cos, angle_sin) * 5.0;
+
+            let time = 1.0;
+            let origin = Point::ZERO + v0 * time + vec2(0.0, -3.0) * time * time;
+            let velocity = v0 + 2.0 * vec2(0.0, -3.0) * time;
 
             let ok_hue = OklabHue::new(360.0 / (LIGHT_COUNT - 1) as f32 * light_i as f32);
             let ok_color = Oklch {
@@ -90,16 +85,82 @@ impl<'assets> Game<'assets> {
             let color: [f32; 3] = lsrgb_color.into();
             let color: Vec3 = color.into();
 
-            let position = origin + v0.extend(0.0) * time + gravity.extend(0.0) * time * time;
+            let meta = GameObject::Light {
+                color: color.extend(light_brightness),
+                light_id: light_id as u32,
+                light_asset,
+            };
 
-            let velocity = v0 + 2.0 * gravity * time;
-            let rotation = velocity.y.atan2(velocity.x);
+            let Shape::Disc { radius } = light_asset.shape;
 
-            self.lights.objects.push(LightObject {
-                position: position.extend(1.0),
-                color: color.extend(brightness),
-                rotation,
-            });
+            let obj = PhysObject::new_disc(origin, radius, 1.0)
+                .with_meta(meta)
+                .with_velocity(velocity);
+
+            physics.add(obj);
         }
+
+        let physics_scene = map
+            .occlusion_segments
+            .iter()
+            .map(|s| {
+                let (a, b) = s.ab();
+                SceneObject::new_segment(a, b)
+            })
+            .collect();
+
+        Ok(Self {
+            map,
+            camera,
+            physics,
+            physics_scene,
+            start: Instant::now(),
+            last_advance: Instant::now(),
+        })
+    }
+
+    pub fn advance(&mut self) {
+        self.physics
+            .advance_by(&self.physics_scene, self.last_advance.elapsed());
+        self.last_advance = Instant::now();
+    }
+
+    pub fn light_deferred_data(&self) -> impl ExactSizeIterator<Item = DeferredLight> {
+        self.physics.iter().map(|obj| {
+            let GameObject::Light { color, .. } = obj.meta;
+            let pos = obj.center;
+            let visibility = self.map.visibility_for(pos).segments;
+            DeferredLight {
+                position: (pos.x, pos.y, 1.0, 1.0).into(),
+                color,
+                visibility,
+            }
+        })
+    }
+
+    pub fn light_quad_data(&self) -> impl ExactSizeIterator<Item = QuadEmitter> {
+        let time_ms = (self.start.elapsed().as_millis() % usize::MAX as u128) as usize;
+        self.physics.iter().map(move |obj| {
+            let pos = obj.center;
+            let GameObject::Light {
+                color,
+                light_id,
+                light_asset,
+            } = obj.meta;
+
+            let frame = (time_ms / light_asset.ms_per_frame) % light_asset.frames;
+            let frame_w = light_asset.frame_size[0] as f32;
+            let frame_h = light_asset.frame_size[1] as f32;
+
+            QuadEmitter {
+                pos: (pos.x, pos.y, 1.0).into(),
+                dim: vec2(1.0, 1.0),
+                rot: 0.0,
+                tex_num: light_id,
+                tex_pos: vec2(frame_w * frame as f32, 0.0),
+                tex_dim: vec2(frame_w, frame_h),
+                tint: color.truncate(),
+            }
+        })
     }
 }

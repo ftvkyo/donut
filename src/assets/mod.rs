@@ -12,6 +12,7 @@ mod texture;
 mod tileset;
 
 pub use config::Config;
+pub use config::Shape;
 pub use light::LightSource;
 pub use map::Map;
 pub use texture::TextureData;
@@ -20,6 +21,8 @@ pub use tileset::Tileset;
 pub use tileset::TilesetId;
 
 pub struct Assets {
+    pub max_timestep: f32,
+
     lights: Vec<LightSource>,
     shaders: BTreeMap<String, String>,
 
@@ -30,8 +33,10 @@ pub struct Assets {
 }
 
 impl Assets {
-    fn empty() -> Self {
+    fn empty(max_timestep: f32) -> Self {
         Self {
+            max_timestep,
+
             lights: Vec::new(),
             shaders: BTreeMap::new(),
 
@@ -50,7 +55,7 @@ impl Assets {
             path.to_string_lossy()
         );
 
-        let mut s = Self::empty();
+        let mut s = Self::empty(config.max_timestep);
 
         let path_lights = path.join("textures");
         for light in config.lights {

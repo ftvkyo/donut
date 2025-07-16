@@ -5,10 +5,17 @@ use log::debug;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum Shape {
+    Disc { radius: f32 },
+}
+
+#[derive(Deserialize)]
 pub struct LightAnimation {
     pub name: String,
     pub frames: usize,
     pub frames_per_second: usize,
+    pub shape: Shape,
 }
 
 #[derive(Deserialize)]
@@ -18,6 +25,7 @@ pub struct Shader {
 
 #[derive(Deserialize)]
 pub struct Config {
+    pub max_timestep: f32,
     pub lights: Vec<LightAnimation>,
     pub shaders: Vec<Shader>,
 }

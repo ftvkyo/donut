@@ -11,7 +11,7 @@ pub struct Map {
     pub name: String,
     inner: tiled::Map,
     tileset_map: Vec<usize>,
-    occlusion_segments: Vec<Segment>,
+    pub occlusion_segments: Vec<Segment>,
 }
 
 impl Map {

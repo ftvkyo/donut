@@ -5,7 +5,7 @@ use log::trace;
 
 use crate::geo::ImpreciseEq;
 
-use super::{point::Point};
+use super::point::Point;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SegmentSide {

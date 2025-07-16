@@ -9,11 +9,27 @@ pub struct Point {
 }
 
 impl Point {
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
 
-    /// Returns a vector `dir` such that `self + dir == other`.    
+    pub fn vec(self) -> Vec2 {
+        Vec2 {
+            x: self.x,
+            y: self.y,
+        }
+    }
+
+    pub fn midpoint(self, other: Self) -> Self {
+        Self {
+            x: (self.x + other.x) / 2.0,
+            y: (self.y + other.y) / 2.0,
+        }
+    }
+
+    /// Returns a vector `dir` such that `self + dir == other`.
     pub fn dir(self, other: Point) -> Vec2 {
         other - self
     }
@@ -24,6 +40,13 @@ impl Point {
 
     pub fn dist_sq(self, other: Point) -> f32 {
         (other - self).length_squared()
+    }
+
+    pub fn lerp(self, other: Point, t: f32) -> Self {
+        Self {
+            x: self.x * (1.0 - t) + other.x * t,
+            y: self.y * (1.0 - t) + other.y * t,
+        }
     }
 }
 
@@ -68,6 +91,13 @@ impl std::ops::Add<Vec2> for Point {
     }
 }
 
+impl std::ops::AddAssign<Vec2> for Point {
+    fn add_assign(&mut self, rhs: Vec2) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+    }
+}
+
 impl std::ops::Sub<Vec2> for Point {
     type Output = Point;
 
@@ -76,6 +106,13 @@ impl std::ops::Sub<Vec2> for Point {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
         }
+    }
+}
+
+impl std::ops::SubAssign<Vec2> for Point {
+    fn sub_assign(&mut self, rhs: Vec2) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
     }
 }
 

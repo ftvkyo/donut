@@ -37,8 +37,6 @@ pub fn init_logging() {
         sync::{Arc, RwLock},
     };
 
-    init_backtrace();
-
     let crate_prefix = format!("{}::", super::CRATE_NAME);
 
     let module_fg = [

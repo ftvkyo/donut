@@ -1,3 +1,5 @@
+max_timestep = 0.016
+
 [[shaders]]
 name = "prepare"
 
@@ -11,3 +13,4 @@ name = "emitters"
 name = "fire"
 frames = 8
 frames_per_second = 8
+shape = { type = "Disc", radius = 0.25 }

@@ -93,8 +93,7 @@ impl View {
                 },
             );
 
-            let deferred_lights =
-                VertexBuffers::new_lights(&gpu, game.lights.deferred_data(game.map))?;
+            let deferred_lights = VertexBuffers::new_lights(&gpu, game.light_deferred_data())?;
 
             let mut light_tmux = Vec::new();
             for (_, tdata) in assets.all_lights() {
@@ -103,8 +102,7 @@ impl View {
             }
             let light_emitters_tmux = TextureMultiplexer::new(&gpu, light_tmux)?;
 
-            let light_emitters_quads =
-                VertexBuffers::new_emitters(&gpu, game.lights.quad_data(Duration::ZERO))?;
+            let light_emitters_quads = VertexBuffers::new_emitters(&gpu, game.light_quad_data())?;
 
             ViewGPUData {
                 camera,
@@ -266,15 +264,13 @@ impl View {
     }
 
     pub fn update_lights(&mut self, game: &Game) -> Result<()> {
-        let time = game.elapsed();
-
         self.gpu_data
             .light_emitters_quads
-            .update_emitters(&self.gpu, game.lights.quad_data(time))?;
+            .update_emitters(&self.gpu, game.light_quad_data())?;
 
         self.gpu_data
             .deferred_lights
-            .update_lights(&self.gpu, game.lights.deferred_data(game.map))?;
+            .update_lights(&self.gpu, game.light_deferred_data())?;
 
         Ok(())
     }

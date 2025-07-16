@@ -16,6 +16,7 @@ mod assets;
 mod game;
 mod geo;
 mod logging;
+mod phys;
 mod view;
 
 pub use logging::init_logging;
