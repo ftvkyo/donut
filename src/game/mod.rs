@@ -15,35 +15,35 @@ use crate::{
     assets::{Assets, Map},
     game::{
         camera::Camera,
-        light::{Light, Lights},
+        light::{LightCollection, LightObject},
     },
 };
 
 const LIGHT_COUNT: usize = 12;
 
-pub struct Game<'m> {
-    pub map: &'m Map,
+pub struct Game<'assets> {
+    pub map: &'assets Map,
 
     pub camera: Camera,
-    pub lights: Lights,
+    pub lights: LightCollection<'assets>,
 
     start: Instant,
 }
 
-impl<'a> Game<'a> {
-    pub fn new(assets: &'a Assets) -> Result<Self> {
+impl<'assets> Game<'assets> {
+    pub fn new(assets: &'assets Assets) -> Result<Self> {
         let map_name = "debug-01";
         let (_, map) = assets.find_map(map_name)?;
 
         let camera = Camera::new(vec2(0.0, 0.0), map.size_tiles());
 
         let light_name = "fire";
-        let (ilight, light) = assets.find_light(light_name)?;
+        let (light_id, light) = assets.find_light(light_name)?;
 
         let mut game = Self {
             map,
             camera,
-            lights: Lights::new(ilight as u32, light.frame_count, light.frame_size),
+            lights: LightCollection::new(light_id as u32, light),
             start: Instant::now(),
         };
         game.set_lights_at(0);
@@ -61,7 +61,7 @@ impl<'a> Game<'a> {
     }
 
     fn set_lights_at(&mut self, ms: u128) {
-        self.lights.inner = Vec::with_capacity(LIGHT_COUNT);
+        self.lights.objects = Vec::with_capacity(LIGHT_COUNT);
 
         let time = ms as f32 / 1000.0;
         // let brightness = 1.0 - (time / 5.0).min(0.9);
@@ -96,7 +96,7 @@ impl<'a> Game<'a> {
             let velocity = v0 + 2.0 * gravity * time;
             let rotation = velocity.y.atan2(velocity.x);
 
-            self.lights.inner.push(Light {
+            self.lights.objects.push(LightObject {
                 position: position.extend(1.0),
                 color: color.extend(brightness),
                 rotation,

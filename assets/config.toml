@@ -10,3 +10,4 @@ name = "emitters"
 [[lights]]
 name = "fire"
 frames = 8
+frames_per_second = 8

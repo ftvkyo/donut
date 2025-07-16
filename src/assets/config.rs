@@ -8,6 +8,7 @@ use serde::Deserialize;
 pub struct LightAnimation {
     pub name: String,
     pub frames: usize,
+    pub frames_per_second: usize,
 }
 
 #[derive(Deserialize)]

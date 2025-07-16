@@ -3,7 +3,7 @@ mod gpu_data;
 mod gpu_struct;
 mod window;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 
@@ -94,7 +94,7 @@ impl View {
             );
 
             let deferred_lights =
-                VertexBuffers::new_lights(&gpu, &game.lights.deferred_data(game.map)?)?;
+                VertexBuffers::new_lights(&gpu, game.lights.deferred_data(game.map))?;
 
             let mut light_tmux = Vec::new();
             for (_, tdata) in assets.all_lights() {
@@ -104,7 +104,7 @@ impl View {
             let light_emitters_tmux = TextureMultiplexer::new(&gpu, light_tmux)?;
 
             let light_emitters_quads =
-                VertexBuffers::new_emitters(&gpu, &game.lights.quad_data(0)?)?;
+                VertexBuffers::new_emitters(&gpu, game.lights.quad_data(Duration::ZERO))?;
 
             ViewGPUData {
                 camera,
@@ -191,6 +191,12 @@ impl View {
             let shader_source = assets.find_shader(shader_name)?;
             let shader = gpu.create_shader(shader_name, shader_source);
 
+            let target = wgpu::ColorTargetState {
+                format: window.output_format(),
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            };
+
             let pipeline = gpu.create_pipeline(PipelineConfig {
                 label: "Emitters",
                 shader: &shader,
@@ -198,7 +204,7 @@ impl View {
                     gpu_data.camera.get_bind_group_layout(),
                     gpu_data.light_emitters_tmux.get_bind_group_layout(),
                 ],
-                targets: &[window.output_format().into()],
+                targets: &[target],
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: TextureDepth::FORMAT,
                     depth_write_enabled: true,
@@ -260,17 +266,15 @@ impl View {
     }
 
     pub fn update_lights(&mut self, game: &Game) -> Result<()> {
-        let frame = (game.elapsed().as_millis() * 60 / 1000 / 10) as usize;
+        let time = game.elapsed();
 
-        let lights_quads = game.lights.quad_data(frame % game.lights.frame_count)?;
         self.gpu_data
             .light_emitters_quads
-            .update_emitters(&self.gpu, &lights_quads)?;
+            .update_emitters(&self.gpu, game.lights.quad_data(time))?;
 
-        let lights_deferred = game.lights.deferred_data(game.map)?;
         self.gpu_data
             .deferred_lights
-            .update_lights(&self.gpu, &lights_deferred)?;
+            .update_lights(&self.gpu, game.lights.deferred_data(game.map))?;
 
         Ok(())
     }

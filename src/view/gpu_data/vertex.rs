@@ -197,29 +197,40 @@ impl VertexBuffers<Vertex, u16> {
 }
 
 impl VertexBuffers<VertexEmitter, u16> {
-    fn convert(quads: &[QuadEmitter]) -> (Vec<VertexEmitter>, Vec<VertexIndex>) {
+    fn convert(
+        quads: impl ExactSizeIterator<Item = QuadEmitter>,
+    ) -> (Vec<VertexEmitter>, Vec<VertexIndex>) {
         let mut vdata = Vec::with_capacity(quads.len() * 4);
         let mut idata = Vec::with_capacity(quads.len() * 6);
-        for (i, quad) in quads.iter().enumerate() {
+        for (i, quad) in quads.enumerate() {
             vdata.extend_from_slice(&quad.vertex_data());
             idata.extend_from_slice(&quad.index_data(i as u16 * 4));
         }
         (vdata, idata)
     }
 
-    pub fn new_emitters(gpu: &GPU, quads: &[QuadEmitter]) -> Result<Self> {
+    pub fn new_emitters(
+        gpu: &GPU,
+        quads: impl ExactSizeIterator<Item = QuadEmitter>,
+    ) -> Result<Self> {
         let (vdata, idata) = Self::convert(quads);
         Self::new(gpu, &vdata, &idata)
     }
 
-    pub fn update_emitters(&mut self, gpu: &GPU, quads: &[QuadEmitter]) -> Result<()> {
+    pub fn update_emitters(
+        &mut self,
+        gpu: &GPU,
+        quads: impl ExactSizeIterator<Item = QuadEmitter>,
+    ) -> Result<()> {
         let (vdata, idata) = Self::convert(quads);
         self.update(gpu, &vdata, &idata)
     }
 }
 
 impl VertexBuffers<VertexDeferred, u16> {
-    fn convert(lights: &[DeferredLight]) -> (Vec<VertexDeferred>, Vec<VertexIndex>) {
+    fn convert(
+        lights: impl ExactSizeIterator<Item = DeferredLight>,
+    ) -> (Vec<VertexDeferred>, Vec<VertexIndex>) {
         let mut vdata = Vec::new();
         let mut idata = Vec::new();
         for light in lights {
@@ -230,12 +241,19 @@ impl VertexBuffers<VertexDeferred, u16> {
         (vdata, idata)
     }
 
-    pub fn new_lights(gpu: &GPU, lights: &[DeferredLight]) -> Result<Self> {
+    pub fn new_lights(
+        gpu: &GPU,
+        lights: impl ExactSizeIterator<Item = DeferredLight>,
+    ) -> Result<Self> {
         let (vdata, idata) = Self::convert(lights);
         Self::new(gpu, &vdata, &idata)
     }
 
-    pub fn update_lights(&mut self, gpu: &GPU, lights: &[DeferredLight]) -> Result<()> {
+    pub fn update_lights(
+        &mut self,
+        gpu: &GPU,
+        lights: impl ExactSizeIterator<Item = DeferredLight>,
+    ) -> Result<()> {
         let (vdata, idata) = Self::convert(lights);
         self.update(gpu, &vdata, &idata)
     }
