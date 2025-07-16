@@ -83,8 +83,8 @@ impl<'a> Game<'a> {
 
             let ok_hue = OklabHue::new(360.0 / (LIGHT_COUNT - 1) as f32 * light_i as f32);
             let ok_color = Oklch {
-                l: 0.7,
-                chroma: 0.2,
+                l: 1.0,
+                chroma: 0.4,
                 hue: ok_hue,
             };
             let lsrgb_color = LinSrgb::from_color(ok_color);
