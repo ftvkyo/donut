@@ -3,7 +3,7 @@ use glam::{vec2, vec3};
 use winit::dpi::LogicalSize;
 
 use crate::{
-    game::geo::{Point, Segment, VisibilityPolygon},
+    geo::{Point, Segment, VisibilityPolygon},
     view::Quad,
 };
 

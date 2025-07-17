@@ -1,7 +1,7 @@
 use glam::Vec4;
 
 use crate::{
-    game::geo::Segment,
+    geo::Segment,
     view::gpu_struct::vertex::{VertexDeferred, VertexIndex},
 };
 

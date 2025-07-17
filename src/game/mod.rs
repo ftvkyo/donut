@@ -8,7 +8,6 @@ use glam::{Vec3, vec2, vec3};
 use palette::{FromColor, LinSrgb, OklabHue, Oklch};
 
 pub mod camera;
-pub mod geo;
 pub mod light;
 
 use crate::{

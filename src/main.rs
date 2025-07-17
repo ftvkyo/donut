@@ -14,6 +14,7 @@ use crate::{
 mod app;
 mod assets;
 mod game;
+mod geo;
 mod logging;
 mod view;
 

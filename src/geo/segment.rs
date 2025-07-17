@@ -6,9 +6,7 @@ use std::{
 use glam::Vec2;
 use log::trace;
 
-use crate::game::geo::ERR;
-
-use super::point::Point;
+use super::{ERR, point::Point};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SegmentSide {
