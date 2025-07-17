@@ -6,20 +6,21 @@ use anyhow::{Context, Result, bail};
 use log::debug;
 
 mod config;
+mod light;
 mod map;
 mod texture;
 mod tileset;
 
 pub use config::Config;
+pub use light::LightSource;
 pub use map::Map;
-pub use texture::LightAnimation;
 pub use texture::TextureData;
 pub use texture::TexturePixel;
 pub use tileset::Tileset;
 pub use tileset::TilesetId;
 
 pub struct Assets {
-    lights: Vec<LightAnimation>,
+    lights: Vec<LightSource>,
     shaders: BTreeMap<String, String>,
 
     maps: Vec<Map>,
@@ -82,13 +83,13 @@ impl Assets {
             );
         }
 
-        let light = LightAnimation::load(light, path)?;
+        let light = LightSource::load(light, path)?;
         self.lights.push(light);
 
         Ok(())
     }
 
-    pub fn find_light(&self, name: &str) -> Result<(usize, &LightAnimation)> {
+    pub fn find_light(&self, name: &str) -> Result<(usize, &LightSource)> {
         self.lights
             .iter()
             .enumerate()
@@ -96,11 +97,11 @@ impl Assets {
             .with_context(|| format!("No light animation '{name}'"))
     }
 
-    pub fn get_light(&self, index: usize) -> Option<&LightAnimation> {
+    pub fn get_light(&self, index: usize) -> Option<&LightSource> {
         self.lights.get(index)
     }
 
-    pub fn all_lights(&self) -> impl Iterator<Item = (usize, &LightAnimation)> {
+    pub fn all_lights(&self) -> impl Iterator<Item = (usize, &LightSource)> {
         self.lights.iter().enumerate()
     }
 

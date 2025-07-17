@@ -3,7 +3,7 @@ use std::time::Duration;
 use glam::{Vec4, Vec4Swizzles, vec2};
 
 use crate::{
-    assets::{LightAnimation, Map},
+    assets::{LightSource, Map},
     view::{DeferredLight, QuadEmitter},
 };
 
@@ -17,13 +17,13 @@ pub struct LightCollection<'a> {
     pub objects: Vec<LightObject>,
 
     light_id: u32,
-    light: &'a LightAnimation,
+    light: &'a LightSource,
 
     ms_per_frame: usize,
 }
 
 impl<'a> LightCollection<'a> {
-    pub fn new(light_id: u32, light: &'a LightAnimation) -> Self {
+    pub fn new(light_id: u32, light: &'a LightSource) -> Self {
         let ms_per_frame = 1000 / light.frames_per_second;
         Self {
             objects: Vec::new(),

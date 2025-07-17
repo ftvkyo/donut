@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail, ensure};
 use glam::{vec2, vec3};
-use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::dpi::LogicalSize;
 
 use crate::{
     game::geo::{Point, Segment, VisibilityPolygon},
