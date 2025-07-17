@@ -36,7 +36,8 @@ impl<'a> LightCollection<'a> {
     pub fn deferred_data(&self, map: &Map) -> impl ExactSizeIterator<Item = DeferredLight> {
         let mut lights = Vec::with_capacity(self.objects.len());
         for light in &self.objects {
-            let visibility = map.visibility_for(light.position.xy().into()).segments;
+            let (x, y) = light.position.xy().into();
+            let visibility = map.visibility_for((x, y).into()).segments;
             lights.push(DeferredLight {
                 position: light.position,
                 color: light.color,

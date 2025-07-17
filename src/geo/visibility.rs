@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn visibility_single() {
         let input = [seg!(1, 1, -1, 1)];
-        let output = compute((0, 0).into(), &input);
+        let output = compute((0.0, 0.0).into(), &input);
         compare(&input, &output);
     }
 
@@ -310,7 +310,7 @@ mod tests {
             seg!(1, 0, 0, 1),
             seg!(0, 1, -1, 0),
         ];
-        let output = compute((0, 0).into(), &input);
+        let output = compute((0.0, 0.0).into(), &input);
         compare(&input, &output);
     }
 
@@ -322,7 +322,7 @@ mod tests {
             seg!(-1, -1, 1, -1),
             seg!(1, -1, 1, 1),
         ];
-        let output = compute((0, 0).into(), &input);
+        let output = compute((0.0, 0.0).into(), &input);
         compare(&input, &output);
     }
 
@@ -344,7 +344,7 @@ mod tests {
         ];
         for x in -4..=4 {
             for y in -4..=4 {
-                let origin = (x, y).into();
+                let origin = (x as f32, y as f32).into();
                 let output = compute(origin, &input);
                 compare(&input, &output);
             }
@@ -383,7 +383,7 @@ mod tests {
         //     | -10  -5   0   5  10
 
         {
-            let origin = (10, 10).into();
+            let origin = (10.0, 10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Top
@@ -397,7 +397,7 @@ mod tests {
         }
 
         {
-            let origin = (10, 5).into();
+            let origin = (10.0, 5.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Right
@@ -408,7 +408,7 @@ mod tests {
         }
 
         {
-            let origin = (10, 0).into();
+            let origin = (10.0, 0.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Right
@@ -419,7 +419,7 @@ mod tests {
         }
 
         {
-            let origin = (10, -5).into();
+            let origin = (10.0, -5.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Right
@@ -430,7 +430,7 @@ mod tests {
         }
 
         {
-            let origin = (10, -10).into();
+            let origin = (10.0, -10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Right
@@ -444,7 +444,7 @@ mod tests {
         }
 
         {
-            let origin = (5, -10).into();
+            let origin = (5.0, -10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Bottom
@@ -455,7 +455,7 @@ mod tests {
         }
 
         {
-            let origin = (0, -10).into();
+            let origin = (0.0, -10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Bottom
@@ -466,7 +466,7 @@ mod tests {
         }
 
         {
-            let origin = (-5, -10).into();
+            let origin = (-5.0, -10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Bottom
@@ -477,7 +477,7 @@ mod tests {
         }
 
         {
-            let origin = (-10, -10).into();
+            let origin = (-10.0, -10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Bottom
@@ -491,7 +491,7 @@ mod tests {
         }
 
         {
-            let origin = (-10, -5).into();
+            let origin = (-10.0, -5.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Left
@@ -502,7 +502,7 @@ mod tests {
         }
 
         {
-            let origin = (-10, 0).into();
+            let origin = (-10.0, 0.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Left
@@ -513,7 +513,7 @@ mod tests {
         }
 
         {
-            let origin = (-10, 5).into();
+            let origin = (-10.0, 5.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Left
@@ -524,7 +524,7 @@ mod tests {
         }
 
         {
-            let origin = (-10, 10).into();
+            let origin = (-10.0, 10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Left
@@ -538,7 +538,7 @@ mod tests {
         }
 
         {
-            let origin = (-5, 10).into();
+            let origin = (-5.0, 10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Top
@@ -549,7 +549,7 @@ mod tests {
         }
 
         {
-            let origin = (0, 10).into();
+            let origin = (0.0, 10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Top
@@ -560,7 +560,7 @@ mod tests {
         }
 
         {
-            let origin = (5, 10).into();
+            let origin = (5.0, 10.0).into();
             let output = compute(origin, &input);
             let expected = [
                 // Top
@@ -581,7 +581,7 @@ mod tests {
             seg!(-2, 1, -1, -2),
             seg!(-3, -4, 3, -4),
         ];
-        let output = compute((0, 0).into(), &input);
+        let output = compute((0.0, 0.0).into(), &input);
         let expected = [
             seg!(1, -2, 2, 1),
             seg!(4, 2, 2, 4),
@@ -604,7 +604,7 @@ mod tests {
             seg!(0, 3, -2, 0),
             seg!(-1, 0, 2, -2),
         ];
-        let output = compute((0, 0).into(), &input);
+        let output = compute((0.0, 0.0).into(), &input);
         let expected = [
             seg!(2, 0, 2, 1),
             seg!(4, 2, 4, 3),
@@ -668,8 +668,7 @@ mod tests {
             seg!(-6, -5, 6, -5),
             seg!(6, 5, 6, -5),
         ];
-        let origin = Point::new(0.0, 1.0);
-        let output = compute(origin, &input);
+        let output = compute((0.0, 1.0).into(), &input);
         let expected = [
             seg!(-2, 2, -2, 0),
             seg!(-6, -2, -6, -5),

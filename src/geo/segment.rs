@@ -33,7 +33,7 @@ impl Segment {
         let a = a.into();
         let b = b.into();
 
-        if a.distance_squared(*b) < ERR {
+        if a.dist_sq(b) < ERR {
             return None;
         }
 
@@ -160,8 +160,8 @@ impl Ord for SegmentByDistance<'_, '_> {
                 // `q` IS on the line defined by `s2`.
                 // Therefore the closest segment is the one that contains the closest point.
                 trace!(" -> Q is on the lines S1 & S2");
-                let dist2_s1 = q.distance_squared(*s1.a).min(q.distance_squared(*s1.b));
-                let dist2_s2 = q.distance_squared(*s2.a).min(q.distance_squared(*s2.b));
+                let dist2_s1 = q.dist_sq(s1.a).min(q.dist_sq(s1.b));
+                let dist2_s2 = q.dist_sq(s2.a).min(q.dist_sq(s2.b));
                 if dist2_s1 < dist2_s2 {
                     return O::Less;
                 } else if dist2_s1 > dist2_s2 {

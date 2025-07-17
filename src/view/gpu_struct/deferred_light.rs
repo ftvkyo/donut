@@ -18,10 +18,10 @@ impl DeferredLight {
             .iter()
             .flat_map(|s| {
                 let (a, b) = s.ab();
-                [a.extend(self.position.z), b.extend(self.position.z)]
+                [[a.x, a.y, self.position.z], [b.x, b.y, self.position.z]]
             })
-            .map(|point| VertexDeferred {
-                pos: point.extend(1.0).into(),
+            .map(|p| VertexDeferred {
+                pos: [p[0], p[1], p[2], 1.0].into(),
                 light_pos: self.position.into(),
                 light_color: self.color.into(),
             });
