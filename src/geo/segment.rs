@@ -6,7 +6,9 @@ use std::{
 use glam::Vec2;
 use log::trace;
 
-use super::{ERR, point::Point};
+use crate::geo::ImpreciseEq;
+
+use super::{point::Point};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SegmentSide {
@@ -33,7 +35,7 @@ impl Segment {
         let a = a.into();
         let b = b.into();
 
-        if a.dist_sq(b) < ERR {
+        if a.is_basically_equal(&b) {
             return None;
         }
 
@@ -52,7 +54,7 @@ impl Segment {
 
         let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
 
-        if denominator.abs() < ERR {
+        if denominator.is_basically_zero() {
             // Lines are parallel or coincident
             return None;
         }
@@ -64,25 +66,26 @@ impl Segment {
     }
 
     pub fn which_side(&self, point: Point) -> Option<SegmentSide> {
-        if point.dir(self.a).length() < ERR {
+        if point.is_basically_equal(&self.a) {
             trace!("{point} is on the start of {self}");
             return None;
         }
 
-        if point.dir(self.b).length() < ERR {
+        if point.is_basically_equal(&self.b) {
             trace!("{point} is on the end of {self}");
             return None;
         }
 
         // TODO: more efficient?
 
+        assert!(!self.a.is_basically_equal(&self.b));
+
         let dir_point = self.a.dir(point);
         let dir_segment = self.a.dir(self.b);
-        assert!(dir_segment.length() > ERR);
 
         let angle = dir_segment.angle_to(dir_point);
 
-        if angle.abs() < ERR || (angle.abs() - PI).abs() < ERR {
+        if angle.is_basically_zero() || angle.abs().is_basically_equal(&PI) {
             trace!("{point} is on the line {self}");
             return None;
         }

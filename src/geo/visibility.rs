@@ -7,8 +7,9 @@ use std::{
 use glam::vec2;
 use log::trace;
 
+use crate::geo::ImpreciseEq;
+
 use super::{
-    ERR,
     point::Point,
     segment::{Segment, SegmentByDistance},
 };
@@ -69,12 +70,12 @@ impl VisibilityPolygon {
 
             let angle_diff = (point_a_angle - point_b_angle).abs();
 
-            if (angle_diff - TAU).abs() < ERR || angle_diff < ERR {
+            if angle_diff.is_basically_zero() || angle_diff.is_basically_equal(&TAU) {
                 trace!("Skipping a segment {segment} aligned with the origin {origin}");
                 continue;
             }
 
-            if (angle_diff - PI).abs() < ERR {
+            if angle_diff.is_basically_equal(&PI) {
                 panic!("Origin {origin} is on the segment {segment}");
             }
 
