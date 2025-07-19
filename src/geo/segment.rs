@@ -1,7 +1,4 @@
-use std::{
-    f32::consts::PI,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 
 use glam::Vec2;
 use log::trace;
@@ -76,21 +73,18 @@ impl Segment {
             return None;
         }
 
-        // TODO: more efficient?
-
         assert!(!self.a.is_basically_equal(&self.b));
 
-        let dir_point = self.a.dir(point);
         let dir_segment = self.a.dir(self.b);
+        let dir_point = self.a.dir(point);
 
-        let angle = dir_segment.angle_to(dir_point);
+        let val = dir_segment.perp_dot(dir_point);
 
-        if angle.is_basically_zero() || angle.abs().is_basically_equal(&PI) {
-            trace!("{point} is on the line {self}");
+        if val.is_basically_zero() {
             return None;
         }
 
-        if angle > 0.0 {
+        if val > 0.0 {
             return Some(SegmentSide::Left);
         } else {
             return Some(SegmentSide::Right);
@@ -170,7 +164,7 @@ impl Ord for SegmentByDistance<'_, '_> {
                 } else if dist2_s1 > dist2_s2 {
                     return O::Greater;
                 } else {
-                    panic!("Tried to compare segments that intersect");
+                    panic!("Tried to compare segments that intersect: S1={s1}, S2={s2}");
                 }
             }
             (Some(q_to_s1), None) => {
@@ -191,7 +185,9 @@ impl Ord for SegmentByDistance<'_, '_> {
                         // `q` is on the line defined by `s2`,
                         // and `s2` is on neither side of `s1`,
                         // both points of `s2` must lay on `s1` and therefore its length is zero.
-                        unreachable!("Got a segment of length zero");
+                        unreachable!(
+                            "Got S2 with length zero? Was comparing S1={s1} & S2={s2} with Q={q}"
+                        );
                     }
                 }
             }
@@ -213,7 +209,9 @@ impl Ord for SegmentByDistance<'_, '_> {
                         // `q` is not on the line defined by `s2`,
                         // and `s1` is on neither side of `s2`,
                         // both points of `s1` must lay on `s2` and therefore its length is zero.
-                        unreachable!("Got a segment of length zero");
+                        unreachable!(
+                            "Got S1 of length zero? Was comparing S1={s1} & S2={s2} with Q={q}"
+                        );
                     }
                 }
             }
