@@ -1,5 +1,22 @@
+fn init_backtrace() {
+    use color_backtrace::{BacktracePrinter, Frame};
+
+    let filter = |frames: &mut Vec<&Frame>| {
+        frames.retain(
+            |frame| matches!(&frame.name, Some(name) if name.starts_with(super::CRATE_NAME)),
+        )
+    };
+
+    BacktracePrinter::new()
+        .strip_function_hash(true)
+        .add_frame_filter(Box::new(filter))
+        .install(color_backtrace::default_output_stream());
+}
+
 #[cfg(not(test))]
 pub fn init_logging() {
+    init_backtrace();
+
     let level = if cfg!(debug_assertions) {
         log::LevelFilter::Debug
     } else {
@@ -20,7 +37,9 @@ pub fn init_logging() {
         sync::{Arc, RwLock},
     };
 
-    let crate_prefix = format!("{}::", module_path!().trim_end_matches("::logging"));
+    init_backtrace();
+
+    let crate_prefix = format!("{}::", super::CRATE_NAME);
 
     let module_fg = [
         Rgb(249, 65, 68),

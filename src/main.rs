@@ -20,6 +20,8 @@ mod view;
 
 pub use logging::init_logging;
 
+pub const CRATE_NAME: &str = module_path!();
+
 fn run() -> Result<()> {
     use winit::event_loop::{ControlFlow, EventLoop};
 
