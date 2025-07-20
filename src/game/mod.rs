@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use glam::{Vec3, Vec4, vec2};
+use glam::{Vec2, Vec3, Vec4, vec2};
 use palette::{FromColor, LinSrgb, OklabHue, Oklch};
 
 pub mod camera;
@@ -148,6 +148,8 @@ impl<'assets> Game<'assets> {
                 light_asset,
             } = obj.meta;
 
+            let rot = Vec2::X.angle_to(obj.velocity_linear);
+
             let frame = (time_ms / light_asset.ms_per_frame) % light_asset.frames;
             let frame_w = light_asset.frame_size[0] as f32;
             let frame_h = light_asset.frame_size[1] as f32;
@@ -155,7 +157,7 @@ impl<'assets> Game<'assets> {
             QuadEmitter {
                 pos: (pos.x, pos.y, 1.0).into(),
                 dim: vec2(1.0, 1.0),
-                rot: 0.0,
+                rot,
                 tex_num: light_id,
                 tex_pos: vec2(frame_w * frame as f32, 0.0),
                 tex_dim: vec2(frame_w, frame_h),
