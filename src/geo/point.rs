@@ -73,8 +73,8 @@ impl std::ops::Sub<Vec2> for Point {
 
     fn sub(self, rhs: Vec2) -> Self::Output {
         Self::Output {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
         }
     }
 }
