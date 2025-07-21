@@ -2,3 +2,7 @@
 
 # Tiled Map Editor
 *.tiled-session
+
+# Performance stuff
+flamegraph.svg
+perf.data
