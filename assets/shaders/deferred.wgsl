@@ -34,7 +34,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 // The value is the color.
 // Sampled by the integer XY position in screen space.
 @group(1) @binding(0)
-var tex_color: texture_2d<f32>;
+var tex_color_specular: texture_2d<f32>;
 
 // The value of the normal in View space in XYZ and the depth in View space in W.
 // Sampled by the integer XY position in screen space.
@@ -44,23 +44,27 @@ var tex_normal_depth: texture_2d<f32>;
 struct FragmentSample {
     color: vec3<f32>,
     normal: vec3<f32>,
+    specular: f32,
     depth: f32,
 }
 
 fn get_sample(frag_pos_fb: vec2<f32>) -> FragmentSample {
     let pos = vec2<u32>(frag_pos_fb);
 
-    var result: FragmentSample;
-    result.color = textureLoad(tex_color, pos, 0).rgb;
+    let color_specular = textureLoad(tex_color_specular, pos, 0);
     let normal_depth = textureLoad(tex_normal_depth, pos, 0);
+
+    var result: FragmentSample;
+    result.color = color_specular.rgb;
+    result.specular = color_specular.w;
     result.normal = normal_depth.xyz;
     result.depth = normal_depth.w;
 
     return result;
 }
 
-fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, light_pos: vec4<f32>, light_color: vec4<f32>) -> vec4<f32> {
-    let specular_shininess = 32.0;
+fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, frag_specular: f32, light_pos: vec4<f32>, light_color: vec4<f32>) -> vec4<f32> {
+    let specular_shininess = pow(2.0, 1.0 + frag_specular * 8.0);
 
     if (light_color.a == 0.0) {
         return vec4(0.0);
@@ -68,11 +72,6 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, light_pos: vec4<f32>, 
 
     // Direction: Fragment -> Light
     let dir_light = normalize(light_pos - frag_pos).xyz;
-
-    // Don't illuminate from the back
-    // if (dir_light.z >= 0.0) {
-    //     return vec4(0.0);
-    // }
 
     // Diffuse component:
     // - depends on the angle between the light ray and fragment normal
@@ -102,7 +101,7 @@ fn fs_main(frag: VertexOutput) -> @location(0) vec4<f32> {
     let frag_sample = get_sample(frag.pos.xy);
     let frag_sample_pos = vec4(frag.frag_pos.xy, frag_sample.depth, 1.0);
 
-    let light = get_light(frag_sample_pos, frag_sample.normal, frag.light_pos, frag.light_color);
+    let light = get_light(frag_sample_pos, frag_sample.normal, frag_sample.specular, frag.light_pos, frag.light_color);
 
     return vec4(frag_sample.color * light.rgb, light.a);
 }

@@ -3,7 +3,7 @@ mod gpu_data;
 mod gpu_struct;
 mod window;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::Result;
 
@@ -63,8 +63,10 @@ impl View {
         let gpu_data = {
             let mut main_tmux = Vec::new();
             for (_, tdata) in assets.all_tilesets() {
-                let tgroup =
-                    TextureGroup::new(&gpu, &[&tdata.texture_color, &tdata.texture_normal])?;
+                let tgroup = TextureGroup::new(
+                    &gpu,
+                    &[&tdata.texture_color, &tdata.texture_normal_specular],
+                )?;
                 main_tmux.push(tgroup);
             }
             let map_tmux = TextureMultiplexer::new(&gpu, main_tmux)?;
