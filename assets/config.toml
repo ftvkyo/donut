@@ -1,7 +1,7 @@
 max_timestep = 0.016
 
 [[shaders]]
-name = "prepare"
+name = "prepare-map"
 
 [[shaders]]
 name = "deferred"

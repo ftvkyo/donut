@@ -50,7 +50,7 @@ pub struct View {
 
     gpu_data: ViewGPUData,
 
-    pipeline_prepare: wgpu::RenderPipeline,
+    pipeline_prepare_map: wgpu::RenderPipeline,
     pipeline_deferred: wgpu::RenderPipeline,
     pipeline_light_emitters: wgpu::RenderPipeline,
 }
@@ -121,13 +121,13 @@ impl View {
             }
         };
 
-        let pipeline_prepare = {
-            let shader_name = "prepare";
+        let pipeline_prepare_map = {
+            let shader_name = "prepare-map";
             let shader_source = assets.find_shader(shader_name)?;
             let shader = gpu.create_shader(shader_name, shader_source);
 
             let pipeline = gpu.create_pipeline(PipelineConfig {
-                label: "Prepare",
+                label: "Prepare Map",
                 shader: &shader,
                 groups: &[
                     gpu_data.camera.get_bind_group_layout(),
@@ -220,7 +220,7 @@ impl View {
             gpu,
             window,
             gpu_data,
-            pipeline_prepare,
+            pipeline_prepare_map,
             pipeline_deferred,
             pipeline_light_emitters,
         })
@@ -280,7 +280,9 @@ impl View {
 
         let rpass_prepare = RenderPass {
             descriptor: &wgpu::RenderPassDescriptor {
-                label: Some("Render ambient light, prepare colors, normals and depths data"),
+                label: Some(
+                    "Render ambient light, prepare colors, normals and depths data of the map",
+                ),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &window_view,
@@ -318,7 +320,7 @@ impl View {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             },
-            pipeline: &self.pipeline_prepare,
+            pipeline: &self.pipeline_prepare_map,
             gdata: &[
                 self.gpu_data.camera.get_bind_group(),
                 self.gpu_data.map_tmux.get_bind_group(),
