@@ -75,6 +75,9 @@ impl<M> CollideWith<&SceneObject> for PhysObject<M> {
 
                             self.velocity_linear -= 2.0 * impulse / self.mass;
                         }
+
+                        let overlap = radius - self.center.dir(location).length();
+                        self.center += location.dir(self.center).clamp_length(overlap, overlap);
                     };
 
                     // This represents the midpoint of the chord
