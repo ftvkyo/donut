@@ -21,3 +21,6 @@ tiled = { version = "0.14.0", default-features = false }
 toml = "0.8.22"
 wgpu = { version = "25.0.2", default-features = false, features = ["metal", "vulkan", "wgsl"] }
 winit = { version = "0.30.11", default-features = false, features = ["wayland", "wayland-dlopen", "x11", "rwh_06"] }
+
+[profile.release]
+debug = true

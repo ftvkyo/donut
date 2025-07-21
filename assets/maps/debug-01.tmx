@@ -28,6 +28,7 @@
  </layer>
  <layer id="1" name="Foreground" width="32" height="18">
   <properties>
+   <property name="Colliding" type="bool" value="true"/>
    <property name="Occluding" type="bool" value="true"/>
   </properties>
   <data encoding="csv">

@@ -3,7 +3,7 @@ use glam::{vec2, vec3};
 use winit::dpi::LogicalSize;
 
 use crate::{
-    geo::{Point, Segment, VisibilityPolygon},
+    geo::{Point, Segment, compute_visibility},
     view::Quad,
 };
 
@@ -11,7 +11,8 @@ pub struct Map {
     pub name: String,
     inner: tiled::Map,
     tileset_map: Vec<usize>,
-    pub occlusion_segments: Vec<Segment>,
+    collision_segments: Vec<Segment>,
+    occlusion_segments: Vec<Segment>,
 }
 
 impl Map {
@@ -30,8 +31,10 @@ impl Map {
             name,
             inner,
             tileset_map,
+            collision_segments: Vec::new(),
             occlusion_segments: Vec::new(),
         };
+        s.recalculate_collision_segments()?;
         s.recalculate_occlusion_segments()?;
 
         Ok(s)
@@ -121,6 +124,87 @@ impl Map {
         })
     }
 
+    pub fn collision(&self) -> &[Segment] {
+        &self.collision_segments
+    }
+
+    pub fn visibility_for(&self, point: Point) -> Vec<Segment> {
+        compute_visibility(point, &self.occlusion_segments)
+    }
+
+    fn recalculate_collision_segments(&mut self) -> Result<()> {
+        let map_w2 = self.inner.width as f32 / 2.0;
+        let map_h2 = self.inner.height as f32 / 2.0;
+
+        for layer in self.inner.layers() {
+            let colliding = match layer.properties.get("Colliding") {
+                Some(tiled::PropertyValue::BoolValue(val)) => *val,
+                _ => false,
+            };
+
+            if !colliding {
+                continue;
+            }
+
+            let layer = layer
+                .as_tile_layer()
+                .context("Only tile layers are supported")?;
+
+            let layer = match layer {
+                tiled::TileLayer::Finite(layer) => layer,
+                _ => bail!("Only finite tile layers are supported"),
+            };
+
+            let layer_w = layer.width() as i32;
+            let layer_h = layer.height() as i32;
+
+            let is_solid = |x: i32, y: i32| {
+                let x = x.clamp(0, layer_w);
+                let y = y.clamp(0, layer_h);
+                layer.get_tile(x, y).is_some()
+            };
+
+            self.collision_segments.clear();
+
+            for x in 0..layer_w {
+                for y in 0..layer_h {
+                    if !is_solid(x, y) {
+                        continue;
+                    }
+
+                    let empty_up = !is_solid(x, y - 1);
+                    let empty_right = !is_solid(x + 1, y);
+                    let empty_down = !is_solid(x, y + 1);
+                    let empty_left = !is_solid(x - 1, y);
+
+                    let (x, y) = (x as f32 - map_w2, (layer_h - 1 - y) as f32 - map_h2);
+
+                    if empty_up {
+                        self.collision_segments
+                            .push(Segment::new((x, y + 1.0), (x + 1.0, y + 1.0)).unwrap());
+                    }
+
+                    if empty_right {
+                        self.collision_segments
+                            .push(Segment::new((x + 1.0, y), (x + 1.0, y + 1.0)).unwrap());
+                    }
+
+                    if empty_down {
+                        self.collision_segments
+                            .push(Segment::new((x, y), (x + 1.0, y)).unwrap());
+                    }
+
+                    if empty_left {
+                        self.collision_segments
+                            .push(Segment::new((x, y), (x, y + 1.0)).unwrap());
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn recalculate_occlusion_segments(&mut self) -> Result<()> {
         let map_w2 = self.inner.width as f32 / 2.0;
         let map_h2 = self.inner.height as f32 / 2.0;
@@ -147,16 +231,30 @@ impl Map {
             let layer_w = layer.width() as i32;
             let layer_h = layer.height() as i32;
 
-            let is_solid = |x: i32, y: i32| {
-                let x = x.clamp(0, layer_w);
-                let y = y.clamp(0, layer_h);
-                layer.get_tile(x, y).is_some()
+            let is_solid = |mut x: i32, mut y: i32| {
+                if x < 0 {
+                    x += layer_w;
+                } else if x > layer_w {
+                    x -= layer_w;
+                }
+
+                if y < 0 {
+                    y += layer_h;
+                } else if y > layer_h {
+                    y += layer_h;
+                }
+
+                return 0 <= x
+                    && x <= layer_w
+                    && 0 <= y
+                    && y <= layer_h
+                    && layer.get_tile(x, y).is_some();
             };
 
             self.occlusion_segments.clear();
 
-            for x in 0..layer_w {
-                for y in 0..layer_h {
+            for x in -layer_w..(layer_w * 2) {
+                for y in -layer_h..(layer_h * 2) {
                     if !is_solid(x, y) {
                         continue;
                     }
@@ -193,7 +291,7 @@ impl Map {
 
         // Also add map edges
 
-        let (map_w2, map_h2) = (map_w2 + 1.0, map_h2 + 1.0);
+        let (map_w2, map_h2) = (map_w2 * 3.0 + 1.0, map_h2 * 3.0 + 1.0);
 
         // Top edge
         self.occlusion_segments
@@ -212,9 +310,5 @@ impl Map {
             .push(Segment::new((-map_w2, -map_h2), (-map_w2, map_h2)).unwrap());
 
         Ok(())
-    }
-
-    pub fn visibility_for(&self, point: Point) -> VisibilityPolygon {
-        VisibilityPolygon::compute(point, &self.occlusion_segments)
     }
 }

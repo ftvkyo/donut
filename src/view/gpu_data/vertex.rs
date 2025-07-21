@@ -229,7 +229,7 @@ impl VertexBuffers<VertexEmitter, u16> {
 
 impl VertexBuffers<VertexDeferred, u16> {
     fn convert(
-        lights: impl ExactSizeIterator<Item = DeferredLight>,
+        lights: impl Iterator<Item = DeferredLight>,
     ) -> (Vec<VertexDeferred>, Vec<VertexIndex>) {
         let mut vdata = Vec::new();
         let mut idata = Vec::new();
@@ -243,7 +243,7 @@ impl VertexBuffers<VertexDeferred, u16> {
 
     pub fn new_lights(
         gpu: &GPU,
-        lights: impl ExactSizeIterator<Item = DeferredLight>,
+        lights: impl Iterator<Item = DeferredLight>,
     ) -> Result<Self> {
         let (vdata, idata) = Self::convert(lights);
         Self::new(gpu, &vdata, &idata)
@@ -252,7 +252,7 @@ impl VertexBuffers<VertexDeferred, u16> {
     pub fn update_lights(
         &mut self,
         gpu: &GPU,
-        lights: impl ExactSizeIterator<Item = DeferredLight>,
+        lights: impl Iterator<Item = DeferredLight>,
     ) -> Result<()> {
         let (vdata, idata) = Self::convert(lights);
         self.update(gpu, &vdata, &idata)

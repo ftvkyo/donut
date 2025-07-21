@@ -49,201 +49,186 @@ impl Event {
     }
 }
 
-pub struct VisibilityPolygon {
-    pub origin: Point,
-    pub segments: Vec<Segment>,
-}
+/// Note: segments must not intersect except at their endpoints.
+pub fn compute_visibility(origin: Point, segments: &[Segment]) -> Vec<Segment> {
+    let angle0 = vec2(1.0, 0.0);
 
-impl VisibilityPolygon {
-    /// Note: segments must not intersect except at their endpoints.
-    pub fn compute(origin: Point, segments: &[Segment]) -> Self {
-        let angle0 = vec2(1.0, 0.0);
+    // Segment start and end events.
+    let mut events = Vec::with_capacity(segments.len() * 2);
 
-        // Segment start and end events.
-        let mut events = Vec::with_capacity(segments.len() * 2);
+    for (segment_index, segment) in segments.iter().enumerate() {
+        let (point_a, point_b) = segment.ab();
 
-        for (segment_index, segment) in segments.iter().enumerate() {
-            let (point_a, point_b) = segment.ab();
+        let point_a_angle = angle0.angle_to(origin.dir(point_a));
+        let point_b_angle = angle0.angle_to(origin.dir(point_b));
 
-            let point_a_angle = angle0.angle_to(origin.dir(point_a));
-            let point_b_angle = angle0.angle_to(origin.dir(point_b));
+        let angle_diff = (point_a_angle - point_b_angle).abs();
 
-            let angle_diff = (point_a_angle - point_b_angle).abs();
-
-            if angle_diff.is_basically_zero() || angle_diff.is_basically_equal(&TAU) {
-                trace!("Skipping a segment {segment} aligned with the origin {origin}");
-                continue;
-            }
-
-            if angle_diff.is_basically_equal(&PI) {
-                panic!("Origin {origin} is on the segment {segment}");
-            }
-
-            let (point_start, point_start_angle, point_end, point_end_angle) =
-                match (point_a_angle < point_b_angle, angle_diff > PI) {
-                    (true, false) | (false, true) => {
-                        (point_a, point_a_angle, point_b, point_b_angle)
-                    }
-                    (false, false) | (true, true) => {
-                        (point_b, point_b_angle, point_a, point_a_angle)
-                    }
-                };
-
-            events.push(Event {
-                kind: EventKind::Start,
-                segment_index,
-                point: point_start,
-                point_angle: point_start_angle,
-            });
-
-            events.push(Event {
-                kind: EventKind::End,
-                segment_index,
-                point: point_end,
-                point_angle: point_end_angle,
-            });
+        if angle_diff.is_basically_zero() || angle_diff.is_basically_equal(&TAU) {
+            trace!("Skipping a segment {segment} aligned with the origin {origin}");
+            continue;
         }
 
-        assert!(events.len() >= 2);
-        events.sort_by(|a, b| a.cmp_angle(&b));
-
-        let mut segments_active_at_first_event = BTreeSet::<usize>::new();
-
-        for event in events.iter().skip(1) {
-            if event.is_start() {
-                segments_active_at_first_event.insert(event.segment_index);
-            } else {
-                segments_active_at_first_event.remove(&event.segment_index);
-            }
+        if angle_diff.is_basically_equal(&PI) {
+            panic!("Origin {origin} is on the segment {segment}");
         }
 
-        let mut segments_active = BTreeSet::<SegmentByDistance<'_, '_>>::new();
-
-        for segment_i in segments_active_at_first_event {
-            let segment = SegmentByDistance::new(&origin, &segments[segment_i]);
-            segments_active.insert(segment);
-        }
-
-        let mut vis_acc_start = None;
-        let mut vis_acc_end = None;
-
-        let mut vis_segments = Vec::new();
-
-        let mut add_vis_event = |point: Point, kind: EventKind| {
-            match (kind, point, vis_acc_start, vis_acc_end) {
-                (EventKind::Start, start, Some(existing_start), _) => {
-                    unreachable!("Got a double start. Existing: {existing_start}, New: {start}")
-                }
-                (EventKind::Start, start, None, _) => {
-                    trace!(" -> Saving {start} as a start of a segment!");
-                    vis_acc_start = Some(start);
-                }
-                (EventKind::End, end, None, Some(existing_end)) => {
-                    unreachable!("Got a double end. Existing: {existing_end}, New: {end}")
-                }
-                (EventKind::End, end, None, None) => {
-                    trace!(" -> Saving {end} as a start of a segment!");
-                    vis_acc_end = Some(end);
-                }
-                (EventKind::End, end, Some(start), _) => {
-                    vis_acc_start = None;
-                    if let Some(seg) = Segment::new(start, end) {
-                        trace!(" -> Adding a completed segment {seg}!");
-                        vis_segments.push(seg);
-                    } else {
-                        trace!(" -> Generated an invalid segment from {start} & {end}, skipping");
-                    }
-                }
+        let (point_start, point_start_angle, point_end, point_end_angle) =
+            match (point_a_angle < point_b_angle, angle_diff > PI) {
+                (true, false) | (false, true) => (point_a, point_a_angle, point_b, point_b_angle),
+                (false, false) | (true, true) => (point_b, point_b_angle, point_a, point_a_angle),
             };
-        };
 
-        for (event_i, event) in events.into_iter().enumerate() {
-            let event_segment = SegmentByDistance::new(&origin, &segments[event.segment_index]);
-            let event_dir = origin.dir(event.point);
+        events.push(Event {
+            kind: EventKind::Start,
+            segment_index,
+            point: point_start,
+            point_angle: point_start_angle,
+        });
 
-            trace!(
-                "Processing event {event_i:2}: point {}, {} of {} (angle {:3.2} deg)",
-                event.point,
-                event.kind,
-                event_segment.segment,
-                event.point_angle.to_degrees(),
-            );
+        events.push(Event {
+            kind: EventKind::End,
+            segment_index,
+            point: point_end,
+            point_angle: point_end_angle,
+        });
+    }
 
-            for segment in &segments_active {
-                trace!(" -> There is an active segment: {}", segment.segment);
-            }
+    assert!(events.len() >= 2);
+    events.sort_by(|a, b| a.cmp_angle(&b));
 
-            if event.is_start() {
-                let is_new_nearest = segments_active
-                    .first()
-                    .map(|nearest| event_segment < *nearest)
-                    .unwrap_or(true);
+    let mut segments_active_at_first_event = BTreeSet::<usize>::new();
 
-                if is_new_nearest {
-                    trace!(" -> This event's segment will be the new nearest");
-
-                    if let Some(nearest) = segments_active.first() {
-                        trace!(" -> Current nearest segment is {}", nearest.segment);
-                        let intersection = nearest.segment.intersect_with_ray(origin, event_dir);
-                        if let Some(point) = intersection {
-                            trace!(" -> Intersection on that segment is: {point}");
-                            add_vis_event(point, EventKind::End);
-                        }
-                    }
-
-                    add_vis_event(event.point, EventKind::Start);
-                }
-
-                trace!(" -> Activating the segment...");
-                segments_active.insert(event_segment);
-            } else {
-                let is_nearest = segments_active.first() == Some(&event_segment);
-
-                trace!(" -> Deactivating the segment...");
-                segments_active.remove(&event_segment);
-
-                if is_nearest {
-                    trace!(" -> This event's segment is current nearest");
-
-                    add_vis_event(event.point, EventKind::End);
-
-                    if let Some(new_nearest) = segments_active.first() {
-                        trace!(" -> The next nearest segment is: {}", new_nearest.segment);
-                        let intersection =
-                            new_nearest.segment.intersect_with_ray(origin, event_dir);
-                        if let Some(point) = intersection {
-                            trace!(" -> Intersection on that segment is: {point}");
-                            add_vis_event(point, EventKind::Start);
-                        }
-                    }
-                }
-            }
-        }
-
-        match (vis_acc_start, vis_acc_end) {
-            (Some(start), Some(end)) => {
-                if let Some(seg) = Segment::new(start, end) {
-                    trace!("Adding a split final segment {seg}!");
-                    vis_segments.push(seg);
-                } else {
-                    trace!("Got an invalid split final segment, skipping");
-                }
-            }
-            (None, None) => (),
-            (start_acc, end_acc) => {
-                unreachable!(
-                    "Could not match the remaining points! Remaining start: {start_acc:?}, Remaining end: {end_acc:?}"
-                )
-            }
-        }
-
-        assert!(vis_segments.len() >= 1);
-
-        Self {
-            origin,
-            segments: vis_segments,
+    for event in events.iter().skip(1) {
+        if event.is_start() {
+            segments_active_at_first_event.insert(event.segment_index);
+        } else {
+            segments_active_at_first_event.remove(&event.segment_index);
         }
     }
+
+    let mut segments_active = BTreeSet::<SegmentByDistance<'_, '_>>::new();
+
+    for segment_i in segments_active_at_first_event {
+        let segment = SegmentByDistance::new(&origin, &segments[segment_i]);
+        segments_active.insert(segment);
+    }
+
+    let mut vis_acc_start = None;
+    let mut vis_acc_end = None;
+
+    let mut vis_segments = Vec::new();
+
+    let mut add_vis_event = |point: Point, kind: EventKind| {
+        match (kind, point, vis_acc_start, vis_acc_end) {
+            (EventKind::Start, start, Some(existing_start), _) => {
+                unreachable!("Got a double start. Existing: {existing_start}, New: {start}")
+            }
+            (EventKind::Start, start, None, _) => {
+                trace!(" -> Saving {start} as a start of a segment!");
+                vis_acc_start = Some(start);
+            }
+            (EventKind::End, end, None, Some(existing_end)) => {
+                unreachable!("Got a double end. Existing: {existing_end}, New: {end}")
+            }
+            (EventKind::End, end, None, None) => {
+                trace!(" -> Saving {end} as a start of a segment!");
+                vis_acc_end = Some(end);
+            }
+            (EventKind::End, end, Some(start), _) => {
+                vis_acc_start = None;
+                if let Some(seg) = Segment::new(start, end) {
+                    trace!(" -> Adding a completed segment {seg}!");
+                    vis_segments.push(seg);
+                } else {
+                    trace!(" -> Generated an invalid segment from {start} & {end}, skipping");
+                }
+            }
+        };
+    };
+
+    for (event_i, event) in events.into_iter().enumerate() {
+        let event_segment = SegmentByDistance::new(&origin, &segments[event.segment_index]);
+        let event_dir = origin.dir(event.point);
+
+        trace!(
+            "Processing event {event_i:2}: point {}, {} of {} (angle {:3.2} deg)",
+            event.point,
+            event.kind,
+            event_segment.segment,
+            event.point_angle.to_degrees(),
+        );
+
+        for segment in &segments_active {
+            trace!(" -> There is an active segment: {}", segment.segment);
+        }
+
+        if event.is_start() {
+            let is_new_nearest = segments_active
+                .first()
+                .map(|nearest| event_segment < *nearest)
+                .unwrap_or(true);
+
+            if is_new_nearest {
+                trace!(" -> This event's segment will be the new nearest");
+
+                if let Some(nearest) = segments_active.first() {
+                    trace!(" -> Current nearest segment is {}", nearest.segment);
+                    let intersection = nearest.segment.intersect_with_ray(origin, event_dir);
+                    if let Some(point) = intersection {
+                        trace!(" -> Intersection on that segment is: {point}");
+                        add_vis_event(point, EventKind::End);
+                    }
+                }
+
+                add_vis_event(event.point, EventKind::Start);
+            }
+
+            trace!(" -> Activating the segment...");
+            segments_active.insert(event_segment);
+        } else {
+            let is_nearest = segments_active.first() == Some(&event_segment);
+
+            trace!(" -> Deactivating the segment...");
+            segments_active.remove(&event_segment);
+
+            if is_nearest {
+                trace!(" -> This event's segment is current nearest");
+
+                add_vis_event(event.point, EventKind::End);
+
+                if let Some(new_nearest) = segments_active.first() {
+                    trace!(" -> The next nearest segment is: {}", new_nearest.segment);
+                    let intersection = new_nearest.segment.intersect_with_ray(origin, event_dir);
+                    if let Some(point) = intersection {
+                        trace!(" -> Intersection on that segment is: {point}");
+                        add_vis_event(point, EventKind::Start);
+                    }
+                }
+            }
+        }
+    }
+
+    match (vis_acc_start, vis_acc_end) {
+        (Some(start), Some(end)) => {
+            if let Some(seg) = Segment::new(start, end) {
+                trace!("Adding a split final segment {seg}!");
+                vis_segments.push(seg);
+            } else {
+                trace!("Got an invalid split final segment, skipping");
+            }
+        }
+        (None, None) => (),
+        (start_acc, end_acc) => {
+            unreachable!(
+                "Could not match the remaining points! Remaining start: {start_acc:?}, Remaining end: {end_acc:?}"
+            )
+        }
+    }
+
+    assert!(vis_segments.len() >= 1);
+
+    return vis_segments;
 }
 
 #[cfg(test)]
@@ -264,10 +249,9 @@ mod tests {
 
     fn compute(origin: Point, input: &[Segment]) -> Vec<Segment> {
         init_logging();
-        let vis = VisibilityPolygon::compute(origin, input);
+        let vis = compute_visibility(origin, input);
         println!("Origin: {origin}");
-        assert!(vis.origin == origin);
-        return vis.segments;
+        return vis;
     }
 
     fn compare(expected: &[Segment], result: &[Segment]) {

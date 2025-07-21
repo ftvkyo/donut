@@ -101,7 +101,7 @@ impl<'assets> Game<'assets> {
         }
 
         let physics_scene = map
-            .occlusion_segments
+            .collision()
             .iter()
             .map(|s| {
                 let (a, b) = s.ab();
@@ -125,16 +125,26 @@ impl<'assets> Game<'assets> {
         self.last_advance = Instant::now();
     }
 
-    pub fn light_deferred_data(&self) -> impl ExactSizeIterator<Item = DeferredLight> {
-        self.physics.iter().map(|obj| {
+    pub fn light_deferred_data(&self) -> impl Iterator<Item = DeferredLight> {
+        let map_size = self.map.size_tiles();
+        let (w, h) = (map_size.width as f32, map_size.height as f32);
+
+        self.physics.iter().flat_map(move |obj| {
             let GameObject::Light { color, .. } = obj.meta;
-            let pos = obj.center;
-            let visibility = self.map.visibility_for(pos).segments;
-            DeferredLight {
+
+            let positions = [
+                obj.center,
+                obj.center + vec2(0.0, h),
+                obj.center + vec2(w, 0.0),
+                obj.center + vec2(0.0, -h),
+                obj.center + vec2(-w, 0.0),
+            ];
+
+            positions.map(|pos| DeferredLight {
                 position: (pos.x, pos.y, 1.0, 1.0).into(),
                 color,
-                visibility,
-            }
+                visibility: self.map.visibility_for(pos),
+            })
         })
     }
 
