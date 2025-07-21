@@ -103,7 +103,7 @@ impl<M> PhysObject<M> {
             mass,
             velocity_linear,
             velocity_angular,
-            velocity_acc: collision_acc,
+            velocity_acc,
             ..
         } = self;
 
@@ -114,7 +114,7 @@ impl<M> PhysObject<M> {
             velocity_linear,
             velocity_angular,
             meta,
-            velocity_acc: collision_acc,
+            velocity_acc,
         }
     }
 
@@ -127,7 +127,7 @@ impl<M> PhysObject<M> {
             mass,
             velocity_linear,
             velocity_angular,
-            velocity_acc: collision_acc,
+            velocity_acc,
             ..
         } = self;
 
@@ -138,7 +138,7 @@ impl<M> PhysObject<M> {
             velocity_linear,
             velocity_angular,
             meta,
-            velocity_acc: collision_acc,
+            velocity_acc,
         }
     }
 }
