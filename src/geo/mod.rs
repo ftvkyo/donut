@@ -8,7 +8,7 @@ use glam::Vec2;
 pub use point::Point;
 pub use segment::Segment;
 pub use torus::ToricGeometry;
-pub use visibility::VisibilityPolygon;
+pub use visibility::compute_visibility;
 
 pub trait ImpreciseEq: Sized {
     const E: f32 = 1e-4;
