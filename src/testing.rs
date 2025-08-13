@@ -7,8 +7,8 @@ use glam::DVec2;
 use proptest::prelude::*;
 
 use crate::{
-    assets::occlusion_segments,
-    geo::{Point, Segment, VisibilityPolygon},
+    assets::collision_segments,
+    geo::{Point, Segment, compute_visibility},
 };
 
 #[derive(Clone, Debug)]
@@ -47,9 +47,22 @@ impl TileGrid {
         self.is_solid(x, y)
     }
 
-    /// Occlusion segments, built the same way as for a map loaded from a file.
+    /// Tile edges, built the same way as the collision segments of a map loaded from a file,
+    /// plus edges one unit around the map.
     pub fn segments(&self) -> Vec<Segment> {
-        occlusion_segments(self.width, self.height, &[|x, y| self.is_solid(x, y)])
+        let mut segments =
+            collision_segments(self.width, self.height, &[|x, y| self.is_solid(x, y)]);
+
+        let x = self.width as f32 / 2.0 + 1.0;
+        let y = self.height as f32 / 2.0 + 1.0;
+        let corners = [(-x, y), (x, y), (x, -y), (-x, -y)];
+
+        for i in 0..corners.len() {
+            let next = (i + 1) % corners.len();
+            segments.push(Segment::new(corners[i], corners[next]).unwrap());
+        }
+
+        segments
     }
 
     /// Grid corner `(x, y)` in map space, the top-left corner of the tile at `(x, y)`.
@@ -155,7 +168,7 @@ pub fn check_visibility(
     extra: &[f64],
     tolerance: f64,
 ) -> Result<(), TestCaseError> {
-    let output = VisibilityPolygon::compute(q, input).segments;
+    let output = compute_visibility(q, input);
 
     for s in &output {
         prop_assert!(

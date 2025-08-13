@@ -3,7 +3,7 @@ use std::{hint::black_box, path::Path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use donut::{
     Assets, Config,
-    geo::{Point, Segment, VisibilityPolygon},
+    geo::{Point, Segment, compute_visibility},
     occlusion_segments,
 };
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -53,7 +53,7 @@ impl Map {
 
         Self {
             name: map.name.clone(),
-            segments: map.occlusion_segments.iter().map(copy).collect(),
+            segments: map.occlusion().iter().map(copy).collect(),
             lights: DEBUG_01_LIGHTS
                 .iter()
                 .map(|&(x, y)| light_in_tile(size.width, size.height, x, y))
@@ -108,64 +108,9 @@ fn copy(segment: &Segment) -> Segment {
     Segment::new(a, b).unwrap()
 }
 
-/// Joins collinear segments that meet end to end where no other segment ends.
-/// Estimates the payoff of merging tile edges; the library does not do this.
-fn merge_collinear(segments: &[Segment]) -> Vec<Segment> {
-    let key = |p: Point| (p.x.to_bits(), p.y.to_bits());
-
-    let mut ends = std::collections::HashMap::<_, usize>::new();
-    for segment in segments {
-        let (a, b) = segment.ab();
-        *ends.entry(key(a)).or_default() += 1;
-        *ends.entry(key(b)).or_default() += 1;
-    }
-
-    // Tile edges are axis-aligned, so sort each one as `(line, start, end)` along its axis.
-    let mut lines: Vec<(bool, f32, f32, f32)> = segments
-        .iter()
-        .map(|segment| {
-            let (a, b) = segment.ab();
-            if a.y == b.y {
-                (true, a.y, a.x.min(b.x), a.x.max(b.x))
-            } else {
-                (false, a.x, a.y.min(b.y), a.y.max(b.y))
-            }
-        })
-        .collect();
-    lines.sort_by(|l, r| l.partial_cmp(r).unwrap());
-
-    let point = |horizontal: bool, line: f32, t: f32| {
-        if horizontal {
-            Point::new(t, line)
-        } else {
-            Point::new(line, t)
-        }
-    };
-
-    let mut merged: Vec<(bool, f32, f32, f32)> = Vec::new();
-    for (horizontal, line, start, end) in lines {
-        match merged.last_mut() {
-            Some(last)
-                if (last.0, last.1, last.3) == (horizontal, line, start)
-                    && ends[&key(point(horizontal, line, start))] == 2 =>
-            {
-                last.3 = end;
-            }
-            _ => merged.push((horizontal, line, start, end)),
-        }
-    }
-
-    merged
-        .into_iter()
-        .map(|(horizontal, line, start, end)| {
-            Segment::new(point(horizontal, line, start), point(horizontal, line, end)).unwrap()
-        })
-        .collect()
-}
-
 fn compute_all(lights: &[Point], segments: &[Segment]) {
     for &light in lights {
-        black_box(VisibilityPolygon::compute(light, segments));
+        black_box(compute_visibility(light, segments));
     }
 }
 
@@ -187,17 +132,6 @@ fn bench_visibility(c: &mut Criterion) {
         let id = BenchmarkId::new(&map.name, map.segments.len());
         group.bench_with_input(id, map, |b, map| {
             b.iter(|| compute_all(&map.lights, &map.segments))
-        });
-    }
-    group.finish();
-
-    let mut group = c.benchmark_group("compute-merged-estimate");
-    group.throughput(Throughput::Elements(LIGHTS as u64));
-    for map in &maps {
-        let segments = merge_collinear(&map.segments);
-        let id = BenchmarkId::new(&map.name, segments.len());
-        group.bench_with_input(id, &segments, |b, segments| {
-            b.iter(|| compute_all(&map.lights, segments))
         });
     }
     group.finish();

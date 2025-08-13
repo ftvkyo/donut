@@ -1,4 +1,4 @@
-//! Property tests of `VisibilityPolygon::compute` on random tile maps, against `ray_cast`.
+//! Property tests of `compute_visibility` on random tile maps, against `ray_cast`.
 //! Light positions are split into categories, so that a failure in one does not hide the others.
 
 use std::{collections::BTreeMap, f64::consts::TAU, panic};
@@ -12,7 +12,7 @@ use proptest::{
 };
 
 use crate::{
-    geo::{Point, Segment, VisibilityPolygon},
+    geo::{Point, Segment, compute_visibility},
     init_logging,
     testing::{TileGrid, check_visibility, panic_message, tile_grid},
 };
@@ -373,7 +373,7 @@ fn light_near_wall_line_below_tile_corner() {
         Segment::new((-15.0, 2.0), (-14.0, 2.0)).unwrap(),
     ];
 
-    VisibilityPolygon::compute(Point::new(-14.000096, 1.544286), &segments);
+    compute_visibility(Point::new(-14.000096, 1.544286), &segments);
 }
 
 // Light positions

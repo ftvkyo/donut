@@ -11,7 +11,7 @@ use proptest::{collection::vec, prelude::*, sample::select, test_runner::RngSeed
 use crate::testing::{TileGrid, distance_to_segment, dvec, ray_cast, tile_grid};
 
 use super::{
-    VisibilityPolygon,
+    compute_visibility,
     point::Point,
     segment::{Segment, SegmentByDistance, SegmentSide},
 };
@@ -436,7 +436,7 @@ fn visibility_origin_near_corner() {
         solid: vec![false, false, false, false, true, false, false, false, false],
     };
 
-    VisibilityPolygon::compute(Point::new(0.49995, -0.50005), &grid.segments());
+    compute_visibility(Point::new(0.49995, -0.50005), &grid.segments());
 }
 
 #[test]
