@@ -688,6 +688,7 @@ dependencies = [
  "pollster",
  "proptest",
  "rand 0.9.1",
+ "rayon",
  "serde",
  "tiled",
  "toml",

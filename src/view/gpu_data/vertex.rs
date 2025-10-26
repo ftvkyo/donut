@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use anyhow::{Result, ensure};
 use bytemuck::Pod;
+use rayon::prelude::*;
 
 use crate::view::{
     DeferredLight, Quad, QuadEmitter,
@@ -192,19 +193,26 @@ impl VertexBuffers<VertexEmitter, VertexIndex> {
 
 impl VertexBuffers<VertexDeferred, VertexIndex> {
     fn convert(
-        lights: impl Iterator<Item = DeferredLight>,
+        lights: impl ParallelIterator<Item = DeferredLight>,
     ) -> (Vec<VertexDeferred>, Vec<VertexIndex>) {
         let mut vdata = Vec::new();
         let mut idata = Vec::new();
+
+        let lights: Vec<_> = lights.collect();
+
         for light in lights {
             let vertices_now = vdata.len() as VertexIndex;
             vdata.extend(light.vertex_data());
             idata.extend(light.index_data(vertices_now));
         }
+
         (vdata, idata)
     }
 
-    pub fn new_lights(gpu: &GPU, lights: impl Iterator<Item = DeferredLight>) -> Result<Self> {
+    pub fn new_lights(
+        gpu: &GPU,
+        lights: impl ParallelIterator<Item = DeferredLight>,
+    ) -> Result<Self> {
         let (vdata, idata) = Self::convert(lights);
         Self::new(gpu, &vdata, &idata)
     }
@@ -212,7 +220,7 @@ impl VertexBuffers<VertexDeferred, VertexIndex> {
     pub fn update_lights(
         &mut self,
         gpu: &GPU,
-        lights: impl Iterator<Item = DeferredLight>,
+        lights: impl ParallelIterator<Item = DeferredLight>,
     ) -> Result<()> {
         let (vdata, idata) = Self::convert(lights);
         self.update(gpu, &vdata, &idata)
