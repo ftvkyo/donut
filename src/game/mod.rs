@@ -6,6 +6,7 @@ use std::{
 use anyhow::Result;
 use glam::{Vec2, Vec3, Vec4, vec2};
 use palette::{FromColor, LinSrgb, OklabHue, Oklch};
+use rayon::prelude::*;
 
 pub mod camera;
 
@@ -125,11 +126,11 @@ impl<'assets> Game<'assets> {
         self.last_advance = Instant::now();
     }
 
-    pub fn light_deferred_data(&self) -> impl Iterator<Item = DeferredLight> {
+    pub fn light_deferred_data(&self) -> impl ParallelIterator<Item = DeferredLight> {
         let map_size = self.map.size_tiles();
         let (w, h) = (map_size.width as f32, map_size.height as f32);
 
-        self.physics.iter().flat_map(move |obj| {
+        self.physics.iter().par_bridge().flat_map(move |obj| {
             let GameObject::Light { color, .. } = obj.meta;
 
             let positions = [
