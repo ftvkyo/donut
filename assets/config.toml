@@ -1,4 +1,5 @@
 max_timestep = 0.016
+max_visibility = 8
 
 [[shaders]]
 name = "prepare-map"

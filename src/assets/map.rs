@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::{Context, Result, bail, ensure};
 use glam::{vec2, vec3};
 use winit::dpi::LogicalSize;
@@ -12,11 +14,15 @@ pub struct Map {
     inner: tiled::Map,
     tileset_map: Vec<usize>,
     collision_segments: Vec<Segment>,
-    occlusion_segments: Vec<Segment>,
+    occlusion_segments: BTreeMap<(i32, i32), Vec<Segment>>,
 }
 
 impl Map {
-    pub(super) fn new(inner: tiled::Map, tileset_map: Vec<usize>) -> Result<Self> {
+    pub(super) fn new(
+        inner: tiled::Map,
+        tileset_map: Vec<usize>,
+        max_visibility: f32,
+    ) -> Result<Self> {
         let name = inner
             .source
             .file_stem()
@@ -32,10 +38,10 @@ impl Map {
             inner,
             tileset_map,
             collision_segments: Vec::new(),
-            occlusion_segments: Vec::new(),
+            occlusion_segments: BTreeMap::new(),
         };
         s.recalculate_collision_segments()?;
-        s.recalculate_occlusion_segments()?;
+        s.recalculate_occlusion_segments(max_visibility)?;
 
         Ok(s)
     }
@@ -129,7 +135,14 @@ impl Map {
     }
 
     pub fn visibility_for(&self, point: Point) -> Vec<Segment> {
-        compute_visibility(point, &self.occlusion_segments)
+        let bucket_key = (point.x.round() as i32, point.y.round() as i32);
+        compute_visibility(
+            point,
+            &self
+                .occlusion_segments
+                .get(&bucket_key)
+                .unwrap_or(&Vec::new()),
+        )
     }
 
     fn recalculate_collision_segments(&mut self) -> Result<()> {
@@ -180,11 +193,11 @@ impl Map {
         Ok(())
     }
 
-    fn recalculate_occlusion_segments(&mut self) -> Result<()> {
+    fn recalculate_occlusion_segments(&mut self, max_visibility: f32) -> Result<()> {
         let map_w2 = self.inner.width as f32 / 2.0;
         let map_h2 = self.inner.height as f32 / 2.0;
 
-        self.occlusion_segments.clear();
+        let mut occlusion_segments = Vec::new();
 
         for layer in self.inner.layers() {
             match layer.properties.get("Occluding") {
@@ -226,29 +239,64 @@ impl Map {
                 map_x,
                 map_y,
                 is_solid,
-                &mut self.occlusion_segments,
+                &mut occlusion_segments,
             );
         }
 
-        // Also add map edges
+        let (map_outer_w2, map_outer_h2) = (map_w2 * 3.0 + 1.0, map_h2 * 3.0 + 1.0);
 
-        let (map_w2, map_h2) = (map_w2 * 3.0 + 1.0, map_h2 * 3.0 + 1.0);
+        // Generate occlusion segment buckets
 
-        // Top edge
-        self.occlusion_segments
-            .push(Segment::new((-map_w2, map_h2), (map_w2, map_h2)).unwrap());
+        self.occlusion_segments.clear();
 
-        // Right edge
-        self.occlusion_segments
-            .push(Segment::new((map_w2, map_h2), (map_w2, -map_h2)).unwrap());
+        let (x_min, x_max) = (-map_outer_w2 as i32, map_outer_w2 as i32);
+        let (y_min, y_max) = (-map_outer_h2 as i32, map_outer_h2 as i32);
 
-        // Bottom edge
-        self.occlusion_segments
-            .push(Segment::new((map_w2, -map_h2), (-map_w2, -map_h2)).unwrap());
+        for x in x_min..x_max {
+            for y in y_min..=y_max {
+                let bucket = self.occlusion_segments.entry((x, y)).or_default();
 
-        // Left edge
-        self.occlusion_segments
-            .push(Segment::new((-map_w2, -map_h2), (-map_w2, map_h2)).unwrap());
+                // Add all segments that are close enough
+
+                for segment in &occlusion_segments {
+                    if segment.dist(Point::new(x as f32, y as f32)) <= max_visibility + 1.0 {
+                        bucket.push((*segment).clone());
+                    }
+                }
+
+                // Also add map edges
+
+                // Top edge
+                bucket.push(
+                    Segment::new((-map_outer_w2, map_outer_h2), (map_outer_w2, map_outer_h2))
+                        .unwrap(),
+                );
+
+                // Right edge
+                bucket.push(
+                    Segment::new((map_outer_w2, map_outer_h2), (map_outer_w2, -map_outer_h2))
+                        .unwrap(),
+                );
+
+                // Bottom edge
+                bucket.push(
+                    Segment::new(
+                        (map_outer_w2, -map_outer_h2),
+                        (-map_outer_w2, -map_outer_h2),
+                    )
+                    .unwrap(),
+                );
+
+                // Left edge
+                bucket.push(
+                    Segment::new(
+                        (-map_outer_w2, -map_outer_h2),
+                        (-map_outer_w2, map_outer_h2),
+                    )
+                    .unwrap(),
+                );
+            }
+        }
 
         Ok(())
     }

@@ -22,6 +22,7 @@ impl Display for SegmentSide {
     }
 }
 
+#[derive(Clone)]
 pub struct Segment {
     a: Point,
     b: Point,
@@ -41,6 +42,18 @@ impl Segment {
 
     pub fn ab(&self) -> (Point, Point) {
         (self.a, self.b)
+    }
+
+    pub fn length(&self) -> f32 {
+        self.a.dist(self.b)
+    }
+
+    // Source: https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Line_defined_by_two_points
+    pub fn dist(&self, point: Point) -> f32 {
+        ((self.b.y - self.a.y) * point.x - (self.b.x - self.a.x) * point.y + self.b.x * self.a.y
+            - self.b.y * self.a.x)
+            .abs()
+            / self.length()
     }
 
     pub fn intersect_with_ray(&self, origin: Point, direction: Vec2) -> Option<Point> {

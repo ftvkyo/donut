@@ -26,6 +26,7 @@ pub struct Shader {
 #[derive(Deserialize)]
 pub struct Config {
     pub max_timestep: f32,
+    pub max_visibility: f32,
     pub lights: Vec<LightAnimation>,
     pub shaders: Vec<Shader>,
 }
