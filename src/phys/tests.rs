@@ -435,3 +435,78 @@ fn stacked_discs_keep_apart() {
 
     assert!(distance > 2.0 * RADIUS - 1e-3);
 }
+
+// Toric wrapping
+
+fn toric_physics<M>(grid: &TileGrid) -> Physics<M> {
+    Physics::new(
+        STEP.as_secs_f32(),
+        ToricGeometry {
+            x: grid.width as f32,
+            y: grid.height as f32,
+        },
+    )
+}
+
+#[test]
+fn wrapping_disc_never_reaches_map_edges() {
+    let grid = TileGrid {
+        width: 8,
+        height: 6,
+        solid: vec![false; 8 * 6],
+    };
+    let velocity = vec2(5.0, 2.0);
+
+    let mut physics = toric_physics(&grid);
+    physics.add(disc((0.0, 0.0), velocity));
+
+    for step in 1..=5000 / STEP.as_millis() {
+        physics.advance_by(&scene(&grid.segments()), STEP);
+
+        let d = &physics.objects[0];
+        let fall = Physics::<()>::G * STEP.as_secs_f32() * step as f32;
+        assert!(d.center.x.abs() <= 4.0 && d.center.y.abs() <= 3.0);
+        assert!(d.velocity_linear.distance(velocity + fall) < 1e-4);
+    }
+}
+
+#[test]
+#[ignore = "collisions ignore the wrapping, so discs wrap into tiles at the opposite map edge"]
+fn disc_bounces_off_tiles_across_wrap_seam() {
+    let (width, height) = (8, 4);
+
+    // A floor, and a block on it at the right or the left map edge
+    for (block, speed) in [(width - 1, -2.0), (0, 2.0)] {
+        let mut solid = vec![false; width * height];
+        solid[3 * width..].fill(true);
+        solid[2 * width + block] = true;
+
+        let grid = TileGrid {
+            width: width as u32,
+            height: height as u32,
+            solid,
+        };
+
+        let mut physics = toric_physics(&grid);
+        physics.add(disc((0.0, -1.0 + RADIUS), vec2(speed, 0.0)));
+
+        let mut bounced = false;
+        for step in 0..3000 / STEP.as_millis() {
+            physics.advance_by(&scene(&grid.segments()), STEP);
+
+            let d = &physics.objects[0];
+            let tile_x = (d.center.x + width as f32 / 2.0).floor() as i32;
+            let tile_y = height as i32 - 1 - (d.center.y + height as f32 / 2.0).floor() as i32;
+
+            assert!(
+                !grid.is_solid(tile_x, tile_y),
+                "Block at {block}: in a solid tile at {} after {step} steps",
+                d.center
+            );
+
+            bounced |= d.velocity_linear.x * speed < 0.0;
+        }
+
+        assert!(bounced, "Block at {block}: no bounce");
+    }
+}
