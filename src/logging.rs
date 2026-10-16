@@ -30,12 +30,21 @@ pub fn init_logging() {
 }
 
 #[cfg(test)]
+thread_local! {
+    /// Each test runs in its own thread, so only the tests that called `init_logging` get logs.
+    /// The others skip formatting, which is expensive at the trace level.
+    static LOGGING_ENABLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
 pub fn init_logging() {
     use anstyle::{RgbColor as Rgb, Style};
     use std::{
         hash::{DefaultHasher, Hash, Hasher},
         sync::{Arc, RwLock},
     };
+
+    LOGGING_ENABLED.set(true);
 
     let crate_prefix = format!("{}::", super::CRATE_NAME);
 
@@ -64,6 +73,10 @@ pub fn init_logging() {
         .filter_level(log::LevelFilter::Trace)
         .format(move |buf, record| {
             use std::io::Write;
+
+            if !LOGGING_ENABLED.get() {
+                return Ok(());
+            }
 
             let level = record.level();
             let level_style = buf.default_level_style(level);
