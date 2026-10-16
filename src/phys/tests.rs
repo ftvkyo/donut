@@ -291,3 +291,147 @@ fn disc_near_joint_is_order_independent() {
     assert!(d1.center.dist(d2.center) < 1e-6);
     assert!(d1.velocity_linear.distance(d2.velocity_linear) < 1e-6);
 }
+
+// Collisions between discs
+
+/// Physics with `discs` after a single collision pass between them, without gravity or motion.
+fn bounced<M>(discs: impl IntoIterator<Item = PhysObject<M>>) -> Physics<M> {
+    let mut physics = new_physics();
+    for d in discs {
+        physics.add(d);
+    }
+
+    physics.for_each_distinct_pair_mut(|d1, d2| d1.collide(d2));
+    physics.for_each_mut(PhysObject::flush_acc);
+
+    physics
+}
+
+fn momentum<'d, M: 'd>(discs: impl IntoIterator<Item = &'d PhysObject<M>>) -> Vec2 {
+    discs.into_iter().map(|d| d.velocity_linear * d.mass).sum()
+}
+
+fn energy<'d, M: 'd>(discs: impl IntoIterator<Item = &'d PhysObject<M>>) -> f32 {
+    discs
+        .into_iter()
+        .map(|d| d.velocity_linear.length_squared() * d.mass / 2.0)
+        .sum()
+}
+
+/// A disc moving at `(1, 0)` with mass `m1` into a disc at rest with mass `m2`.
+fn head_on(m1: f32, m2: f32) -> [PhysObject<()>; 2] {
+    [
+        PhysObject::new_disc((0.0, 0.0).into(), RADIUS, m1).with_velocity(Vec2::X),
+        PhysObject::new_disc((2.0 * RADIUS, 0.0).into(), RADIUS, m2),
+    ]
+}
+
+#[test]
+fn disc_collisions_conserve_momentum() {
+    let oblique = [
+        disc((0.0, 0.0), vec2(1.0, 0.5)),
+        PhysObject::new_disc((0.4, 0.3).into(), RADIUS, 3.0).with_velocity(vec2(-0.5, 0.0)),
+    ];
+
+    for discs in [head_on(1.0, 1.0), head_on(2.0, 1.0), oblique] {
+        let before = momentum(&discs);
+        let after = momentum(bounced(discs).iter());
+        assert!(before.distance(after) < 1e-6, "{before} -> {after}");
+    }
+}
+
+#[test]
+fn equal_disc_collision_conserves_energy() {
+    let discs = head_on(1.0, 1.0);
+    let before = energy(&discs);
+
+    let physics = bounced(discs);
+    let after = energy(physics.iter());
+
+    assert_eq!(before, after);
+    assert_eq!(physics.objects[0].velocity_linear, Vec2::ZERO);
+    assert_eq!(physics.objects[1].velocity_linear, Vec2::X);
+}
+
+#[test]
+#[ignore = "swapping projected momenta changes the energy of discs with unequal masses"]
+fn unequal_disc_collision_conserves_energy() {
+    let ratios: Vec<_> = [(2.0, 1.0), (1.0, 2.0)]
+        .into_iter()
+        .map(|(m1, m2)| {
+            let discs = head_on(m1, m2);
+            let before = energy(&discs);
+            let after = energy(bounced(discs).iter());
+            println!("Masses {m1} and {m2}: energy {before} -> {after}");
+            after / before
+        })
+        .collect();
+
+    assert!(ratios.iter().all(|r| (r - 1.0).abs() < 1e-6), "{ratios:?}");
+}
+
+#[test]
+#[ignore = "discs touching on both sides at once stop instead of bouncing"]
+fn simultaneous_disc_collisions_conserve_energy() {
+    let discs = [
+        disc((-2.0 * RADIUS, 0.0), Vec2::X),
+        disc((0.0, 0.0), Vec2::ZERO),
+        disc((2.0 * RADIUS, 0.0), Vec2::NEG_X),
+    ];
+    let before = energy(&discs);
+
+    let physics = bounced(discs);
+    let after = energy(physics.iter());
+
+    for d in physics.iter() {
+        println!("{} at {}", d.velocity_linear, d.center);
+    }
+
+    assert_eq!(before, after);
+}
+
+#[test]
+fn disc_collisions_are_pair_order_independent() {
+    // Three discs touching each other, with different masses and velocities
+    let discs = [
+        ((0.0, 0.0), vec2(1.0, 0.5), 1.0),
+        ((2.0 * RADIUS, 0.0), vec2(-1.0, 0.0), 2.0),
+        ((RADIUS, 3.0f32.sqrt() * RADIUS), vec2(0.0, -2.0), 3.0),
+    ]
+    .map(|(center, velocity, mass)| {
+        PhysObject::new_disc(center.into(), RADIUS, mass).with_velocity(velocity)
+    });
+
+    let reference = bounced(discs.clone());
+
+    for order in [[0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
+        let physics = bounced(order.map(|i| discs[i].clone().with_meta(i)));
+
+        for d in physics.iter() {
+            let expected = reference.objects[d.meta].velocity_linear;
+            assert!(d.velocity_linear.distance(expected) < 1e-6, "{order:?}");
+        }
+    }
+}
+
+#[test]
+#[ignore = "disc-disc contacts have no positional correction, so stacked discs sink"]
+fn stacked_discs_keep_apart() {
+    let floor = [segment((-2.0, 0.0), (2.0, 0.0))];
+
+    let mut physics = new_physics();
+    physics.add(disc((0.0, RADIUS), Vec2::ZERO));
+    physics.add(disc((0.0, 3.0 * RADIUS), Vec2::ZERO));
+
+    for _ in 0..10_000 / STEP.as_millis() {
+        physics.advance_by(&floor, STEP);
+    }
+
+    let [d1, d2] = &physics.objects[..] else {
+        unreachable!()
+    };
+    let distance = d1.center.dist(d2.center);
+    println!("Discs at {} and {}, {distance} apart", d1.center, d2.center);
+
+    assert!(distance > 2.0 * RADIUS - 1e-3);
+}
