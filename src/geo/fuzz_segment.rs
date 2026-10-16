@@ -13,7 +13,7 @@ use crate::testing::{TileGrid, ray_cast, tile_grid};
 use super::{
     VisibilityPolygon,
     point::Point,
-    segment::{Segment, SegmentByDistance},
+    segment::{Segment, SegmentByDistance, SegmentSide},
 };
 
 /// Crossings closer than this along a ray are considered a tie.
@@ -266,6 +266,31 @@ fn check_all(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError
     check_set(q, crossed)
 }
 
+/// `intersect_with_ray` finds the crossings for the unnormalised directions the visibility sweep passes.
+fn check_intersect_with_ray(
+    q: Point,
+    through: Point,
+    crossed: &[(f64, &Segment)],
+) -> Result<(), TestCaseError> {
+    let unit = (dvec(through) - dvec(q)).normalize();
+
+    for &(t, s) in crossed {
+        let expected = dvec(q) + unit * t;
+        let point = s.intersect_with_ray(q, q.dir(through));
+        prop_assert!(
+            point.is_some_and(|p| dvec(p).distance(expected) < MARGIN),
+            "Q={}, through={}, S={}: got {:?}, expected {}",
+            q,
+            through,
+            s,
+            point,
+            expected
+        );
+    }
+
+    Ok(())
+}
+
 fn config(cases: u32) -> ProptestConfig {
     ProptestConfig {
         cases,
@@ -301,6 +326,13 @@ proptest! {
     fn tile_map_set((grid, q, through) in tile_scene(12)) {
         let segments = grid.segments();
         check_set(&q, &crossed(q, through, &segments))?;
+    }
+
+    #[test]
+    #[ignore = "grazing rays: None, or off by more than 1e-3"]
+    fn tile_map_intersect_with_ray((grid, q, through) in tile_scene(12)) {
+        let segments = grid.segments();
+        check_intersect_with_ray(q, through, &crossed(q, through, &segments))?;
     }
 
     #[test]
@@ -512,4 +544,69 @@ fn s1_straddling_line_of_s2_rounding() {
     assert!(crossed.len() == 2 && crossed[0].0 + MARGIN < crossed[1].0);
 
     assert_eq!(cmp(&q, s1, s2), Ordering::Less);
+}
+
+#[test]
+#[ignore = "rounding in perp_dot exceeds the epsilon"]
+fn which_side_rounding() {
+    let (q, _, [s1, s2]) = nearly_parallel();
+    let (a, b) = s1.ab();
+    let s2a = s2.ab().0;
+
+    let orientation_q = orientation(dvec(a), dvec(b), dvec(q));
+    let orientation_s2a = orientation(dvec(a), dvec(b), dvec(s2a));
+    assert!(orientation_q * orientation_s2a < 0.0);
+
+    assert_ne!(s1.which_side(s2a), s1.which_side(q));
+}
+
+#[test]
+#[ignore = "absolute epsilon on the unnormalised perp_dot"]
+fn which_side_scale_invariant() {
+    let long = seg((0.0, 0.0), (1.0, 0.0));
+    assert_eq!(
+        long.which_side(Point::new(0.5, 0.5)),
+        Some(SegmentSide::Left)
+    );
+
+    // The same shape, 100 times smaller
+    let short = seg((0.0, 0.0), (0.01, 0.0));
+    assert_eq!(
+        short.which_side(Point::new(0.005, 0.005)),
+        Some(SegmentSide::Left)
+    );
+}
+
+#[test]
+#[ignore = "absolute epsilon on the denominator"]
+fn intersect_with_ray_direction_length() {
+    // The ray hits the segment at (5, 0.5) at an angle of 5.7 degrees
+    let segment = seg((4.5, 0.5), (5.5, 0.5));
+    let dir = Vec2::new(1.0, 0.1);
+
+    let hit = segment.intersect_with_ray(Point::ZERO, dir).unwrap();
+    assert!(hit.vec().distance(Vec2::new(5.0, 0.5)) < 1e-4);
+
+    // The same ray, with the direction to an event point 0.0005 away
+    assert!(
+        segment
+            .intersect_with_ray(Point::ZERO, dir * 5e-4)
+            .is_some()
+    );
+}
+
+#[test]
+#[ignore = "intersects lines, not the segment and the ray"]
+fn intersect_with_ray_outside_segment() {
+    let segment = seg((1.0, 1.0), (1.0, 2.0));
+
+    assert_eq!(segment.intersect_with_ray(Point::ZERO, Vec2::X), None);
+}
+
+#[test]
+#[ignore = "intersects lines, not the segment and the ray"]
+fn intersect_with_ray_behind_origin() {
+    let segment = seg((1.0, -1.0), (1.0, 1.0));
+
+    assert_eq!(segment.intersect_with_ray(Point::ZERO, Vec2::NEG_X), None);
 }
