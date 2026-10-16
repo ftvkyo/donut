@@ -200,6 +200,20 @@ fn dropped_disc_comes_to_rest() {
     assert_eq!(d.center.x, 0.0);
 }
 
+#[test]
+fn disc_slides_without_friction() {
+    let floor = [segment((-10.0, 0.0), (10.0, 0.0))];
+
+    let mut physics = new_physics();
+    physics.add(disc((-5.0, RADIUS), Vec2::X));
+
+    for _ in 0..5000 / STEP.as_millis() {
+        physics.advance_by(&floor, STEP);
+    }
+
+    assert!((physics.objects[0].velocity_linear.x - 1.0).abs() < 1e-5);
+}
+
 /// Largest vertical speed of a disc sliding across `floor` with its top at `y = 0.5`.
 fn sliding_vertical_speed(floor: &[SceneObject], speed: f32) -> f32 {
     let start = (-1.5 * speed.signum(), 0.5 + RADIUS);
