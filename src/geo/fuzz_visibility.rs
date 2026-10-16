@@ -1,7 +1,7 @@
 //! Property tests of `VisibilityPolygon::compute` on random tile maps, against `ray_cast`.
 //! Light positions are split into categories, so that a failure in one does not hide the others.
 
-use std::{collections::BTreeMap, f64::consts::TAU, panic};
+use std::{collections::BTreeMap, f32::consts::PI, f64::consts::TAU, panic};
 
 use glam::{Vec2, vec2};
 use proptest::{
@@ -343,6 +343,40 @@ fn light_in_tile_translated_by_1000() {
         (0.9500193, -0.1683228),
         Transform::new(1.0, 1000.0),
     );
+}
+
+// Suspected causes
+
+#[test]
+#[ignore = "returns None: the epsilon applies to a denominator that scales with the direction"]
+fn intersect_with_short_ray() {
+    let segment = Segment::new((-1.0, 1.0), (1.0, 1.0)).unwrap();
+    let hit = segment.intersect_with_ray(Point::ZERO, vec2(0.0, 5e-5));
+    assert_eq!(hit, Some(Point::new(0.0, 1.0)));
+}
+
+#[test]
+#[ignore = "returns the intersection with the line through the segment"]
+fn intersect_with_ray_missing_segment() {
+    let segment = Segment::new((0.0, 1.0), (1.0, 1.0)).unwrap();
+    assert_eq!(
+        segment.intersect_with_ray(Point::ZERO, vec2(-1.0, 1.0)),
+        None
+    );
+    assert_eq!(
+        segment.intersect_with_ray(Point::ZERO, vec2(0.5, -1.0)),
+        None
+    );
+}
+
+#[test]
+#[ignore = "`Vec2::angle_to` uses acos, so angles within ~3e-4 of 0 or PI collapse"]
+fn angle_to_near_0_and_pi() {
+    let angle = Vec2::X.angle_to(vec2(1.0, 1e-4));
+    assert!((angle - 1e-4).abs() < 1e-6, "{angle}");
+
+    let angle = Vec2::X.angle_to(vec2(-1.0, 1e-4));
+    assert!((angle - (PI - 1e-4)).abs() < 1e-6, "{angle}");
 }
 
 // Light positions
