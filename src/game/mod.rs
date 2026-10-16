@@ -173,16 +173,12 @@ mod tests {
 
     use glam::DVec2;
 
-    use crate::{assets::Config, init_logging, phys::object::PhysObjectShape, testing::ray_cast};
+    use crate::{assets::Config, phys::object::PhysObjectShape, testing::ray_cast};
 
     use super::*;
 
     #[test]
     fn lights_stay_below_tunnelling_speed() {
-        init_logging();
-        // Tracing every collision makes this take minutes
-        log::set_max_level(log::LevelFilter::Debug);
-
         let dir_assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
         let config = Config::load(dir_assets.join("config.toml")).unwrap();
         let assets = Assets::resolve(config, dir_assets).unwrap();
