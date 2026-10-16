@@ -169,19 +169,28 @@ impl<'assets> Game<'assets> {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path, time::Duration};
+    use std::{panic, path::Path, time::Duration};
 
     use glam::DVec2;
 
-    use crate::{assets::Config, phys::object::PhysObjectShape, testing::ray_cast};
+    use crate::{
+        assets::Config,
+        geo::{Segment, VisibilityPolygon},
+        phys::object::PhysObjectShape,
+        testing::ray_cast,
+    };
 
     use super::*;
 
-    #[test]
-    fn lights_stay_below_tunnelling_speed() {
+    fn assets() -> Assets {
         let dir_assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
         let config = Config::load(dir_assets.join("config.toml")).unwrap();
-        let assets = Assets::resolve(config, dir_assets).unwrap();
+        Assets::resolve(config, dir_assets).unwrap()
+    }
+
+    #[test]
+    fn lights_stay_below_tunnelling_speed() {
+        let assets = assets();
         let mut game = Game::new(&assets).unwrap();
 
         // The longest step the physics takes with the game's `max_timestep`
@@ -219,5 +228,53 @@ mod tests {
 
         assert!(fastest < threshold);
         assert_eq!(tunnelled, 0);
+    }
+
+    /// Plays `seconds` of the game in 16 ms steps, computing the visibility of every light
+    /// after each step like `light_deferred_data` does.
+    /// Returns the time, light position and message of every panic.
+    fn play(seconds: u64) -> Vec<(Duration, Point, String)> {
+        let assets = assets();
+        let mut game = Game::new(&assets).unwrap();
+
+        let step = Duration::from_millis(16);
+        let mut time = Duration::ZERO;
+        let mut panics = Vec::new();
+
+        while time < Duration::from_secs(seconds) {
+            game.physics.advance_by(&game.physics_scene, step);
+            time += step;
+
+            for obj in game.physics.iter() {
+                if let Err(payload) = panic::catch_unwind(|| game.map.visibility_for(obj.center)) {
+                    let message = payload
+                        .downcast::<String>()
+                        .map_or_else(|_| String::new(), |m| *m);
+                    panics.push((time, obj.center, message));
+                }
+            }
+        }
+
+        panics
+    }
+
+    /// `cargo test --release --lib lights_have_visibility -- --ignored`
+    #[test]
+    #[ignore = "slow, and panics once in 225000 light updates, at 119 s"]
+    fn lights_have_visibility_for_5_minutes() {
+        let panics = play(300);
+        assert!(panics.is_empty(), "{} panics: {panics:#?}", panics.len());
+    }
+
+    /// Shrunk from the first panic of `lights_have_visibility_for_5_minutes`, at 119 s.
+    #[test]
+    #[ignore = "Got a double start. Existing: [-14  2], New: [-14  2]"]
+    fn light_near_wall_line_below_tile_corner() {
+        let segments = [
+            Segment::new((-14.0, 2.0), (-14.0, 3.0)).unwrap(),
+            Segment::new((-15.0, 2.0), (-14.0, 2.0)).unwrap(),
+        ];
+
+        VisibilityPolygon::compute(Point::new(-14.000096, 1.544286), &segments);
     }
 }
