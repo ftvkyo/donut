@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod fuzz_visibility;
 mod point;
 mod segment;
 mod torus;
