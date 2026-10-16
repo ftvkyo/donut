@@ -87,13 +87,13 @@ impl Display for TileGrid {
 pub fn tile_grid(max_size: u32, density: f64) -> impl Strategy<Value = TileGrid> {
     (1..=max_size, 1..=max_size).prop_flat_map(move |(width, height)| {
         let len = (width * height) as usize;
-        proptest::collection::vec(proptest::bool::weighted(density), len).prop_map(
-            move |solid| TileGrid {
+        proptest::collection::vec(proptest::bool::weighted(density), len).prop_map(move |solid| {
+            TileGrid {
                 width,
                 height,
                 solid,
-            },
-        )
+            }
+        })
     })
 }
 
