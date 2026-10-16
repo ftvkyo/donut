@@ -475,3 +475,41 @@ fn t_junction_ordered() {
     assert_eq!(cmp(&q, &s1, &s2), Ordering::Less);
     assert_eq!(cmp(&q, &s1, &s2_reversed), Ordering::Less);
 }
+
+#[test]
+fn s1_straddling_line_of_s2() {
+    let q = Point::ZERO;
+
+    // S2 is between Q and S1
+    let s1 = seg((2.0, -1.0), (2.0, 3.0));
+    let s2 = seg((0.5, 1.0), (1.5, 1.0));
+    assert_eq!(cmp(&q, &s1, &s2), Ordering::Greater);
+
+    // S2 is behind S1
+    let s1 = seg((1.0, -1.0), (1.0, 3.0));
+    let s2 = seg((1.5, 2.0), (2.5, 2.0));
+    assert_eq!(cmp(&q, &s1, &s2), Ordering::Less);
+}
+
+/// Nearly parallel segments with S2 entirely behind S1, where rounding puts `S2.a` on the side of Q.
+fn nearly_parallel() -> (Point, Point, [Segment; 2]) {
+    let q = Point::new(9.769606, 27.473782);
+    let through = Point::new(-5.192809, 16.254354);
+    let s1 = seg((22.849222, -21.134676), (-24.81857, 42.435883));
+    let s2 = seg((0.38970214, 8.817713), (-10.775321, 23.690992));
+
+    (q, through, [s1, s2])
+}
+
+#[test]
+#[ignore = "only one end of S2 is checked: Greater"]
+fn s1_straddling_line_of_s2_rounding() {
+    let (q, through, segments) = nearly_parallel();
+    let [s1, s2] = &segments;
+
+    let crossed = crossed(q, through, &segments);
+    assert!(distance(s1, s2) > 0.0);
+    assert!(crossed.len() == 2 && crossed[0].0 + MARGIN < crossed[1].0);
+
+    assert_eq!(cmp(&q, s1, s2), Ordering::Less);
+}
