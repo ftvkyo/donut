@@ -13,6 +13,7 @@ use proptest::{
 
 use crate::{
     geo::{Point, Segment},
+    init_logging,
     testing::{TileGrid, check_visibility, tile_grid},
 };
 
@@ -223,6 +224,125 @@ fn kind(message: &str) -> String {
     let message = message.trim_start_matches("internal error: entered unreachable code: ");
     let kind = message.split([':', '[', ',']).next().unwrap();
     kind.trim().replace(|c: char| c.is_ascii_digit(), "#")
+}
+
+// Regressions, shrunk from failures of the categories above.
+// The tile of a single-tile map only has walls on its right and bottom.
+
+fn regression(rows: &[&str], q: (f32, f32), transform: Transform) {
+    init_logging();
+
+    if let Err(error) = check(&TileGrid::from_rows(rows), q.into(), transform, &[]) {
+        panic!("{error}");
+    }
+}
+
+#[test]
+#[ignore = "Stray output segment: [-8.268593  0]<=>[-10 -2] does not lie along input segments"]
+fn light_0_012_from_line_of_far_walls() {
+    let rows = ["................#.", "...............#.#"];
+    regression(&rows, (-8.45553, -0.012243271), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Origin [0.5  0] is on the segment [0.5 -0.5]<=>[0.5 0.5]"]
+fn light_on_wall() {
+    regression(&["#"], (0.5, 0.0), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Origin [0.500001  0] is on the segment [0.5 -0.5]<=>[0.5 0.5]"]
+fn light_1e_6_from_wall() {
+    regression(&["#"], (0.500001, 0.0), Transform::IDENTITY);
+}
+
+#[test]
+fn light_1e_4_from_wall() {
+    let grid = TileGrid::from_rows(&["#"]);
+    check(&grid, Point::new(0.5001, 0.0), Transform::IDENTITY, &[]).unwrap();
+}
+
+#[test]
+#[ignore = "Origin [ 0 9.9995] is on the segment [-17 10]<=>[17 10]"]
+fn light_5e_4_from_map_edge() {
+    let empty = ".".repeat(32);
+    regression(&[empty.as_str(); 18], (0.0, 9.9995), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Tried to compare segments that intersect: S1=[0.5 -0.5]<=>[0.5 0.5], S2=[-0.5 -0.5]<=>[0.5 -0.5]"]
+fn light_on_corner_of_two_walls() {
+    regression(&["#"], (0.5, -0.5), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double start. Existing: [-1.5 1.5], New: [0.5 0.5]"]
+fn light_on_end_of_vertical_wall() {
+    regression(&["#"], (0.5, 0.5), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Could not match the remaining points! Remaining start: None, Remaining end: Some(..)"]
+fn light_on_end_of_horizontal_wall() {
+    regression(&["#"], (-0.5, -0.5), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double start. Existing: [1.5 -1.5], New: [0.5 -0.5]"]
+fn light_1e_6_off_corner_of_two_walls() {
+    regression(&["#"], (0.49999905, -0.50000095), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double end. Existing: [-1.5 -1.5], New: [1.5 1.5]"]
+fn light_1e_5_off_end_of_horizontal_wall() {
+    regression(&["#"], (-0.50001, -0.50001), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Could not match the remaining points! Remaining start: None, Remaining end: Some(..)"]
+fn light_1e_6_off_end_of_horizontal_wall() {
+    regression(&["#"], (-0.49999905, -0.50000095), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double end. Existing: [-1.5 -0.00001], New: [0.5 -1]"]
+fn light_on_wall_line_1e_5_beyond_its_end() {
+    regression(&[".", "#"], (0.5, 1e-5), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double start. Existing: [0.5 -0.5], New: [0.5 -0.5]"]
+fn light_1e_5_from_wall_line_beyond_its_end() {
+    regression(&["#"], (0.49999046, -0.57826424), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double end. Existing: [-1.5 -0.20370993], New: [0.5  0]"]
+fn light_1e_4_from_wall_line_beyond_its_end() {
+    regression(&[".", "#"], (0.4999001, 0.20368958), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Wrong output segment: expected [ 2 -0.5]<=>[ 2 0.5], got [2.9999998 -0.5006663]<=>[ 3 1.5]"]
+fn light_along_row_of_walls_sees_through_its_end() {
+    regression(&["####"], (-2.001, -0.49900007), Transform::IDENTITY);
+}
+
+#[test]
+#[ignore = "Got a double start. Existing: [0.005 -0.005], New: [0.005 -0.005]"]
+fn light_in_tile_scaled_by_0_01() {
+    regression(&["#"], (-0.36707342, -0.6228612), Transform::new(0.01, 0.0));
+}
+
+#[test]
+#[ignore = "Overlapping output segments: [1001.5 1002]<=>[1000.1094 1002] and [1000.5 1001]<=>[1000.5 1000]"]
+fn light_in_tile_translated_by_1000() {
+    regression(
+        &["#", "."],
+        (0.9500193, -0.1683228),
+        Transform::new(1.0, 1000.0),
+    );
 }
 
 // Light positions
