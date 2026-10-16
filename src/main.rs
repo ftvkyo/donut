@@ -1,27 +1,9 @@
-#![cfg_attr(test, allow(dead_code))]
-
 use std::path::Path;
 
 use anyhow::Result;
 use log::{debug, error, info};
 
-use crate::{
-    app::App,
-    assets::{Assets, Config},
-    game::Game,
-};
-
-mod app;
-mod assets;
-mod game;
-mod geo;
-mod logging;
-mod phys;
-mod view;
-
-pub use logging::init_logging;
-
-pub const CRATE_NAME: &str = module_path!();
+use donut::{App, Assets, Config, Game, init_logging};
 
 fn run() -> Result<()> {
     use winit::event_loop::{ControlFlow, EventLoop};

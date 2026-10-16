@@ -122,8 +122,7 @@ impl Map {
     }
 
     fn recalculate_occlusion_segments(&mut self) -> Result<()> {
-        let map_w2 = self.inner.width as f32 / 2.0;
-        let map_h2 = self.inner.height as f32 / 2.0;
+        let mut occluding_layers = Vec::new();
 
         for layer in self.inner.layers() {
             let occluding = match layer.properties.get("Occluding") {
@@ -144,72 +143,11 @@ impl Map {
                 _ => bail!("Only finite tile layers are supported"),
             };
 
-            let layer_w = layer.width() as i32;
-            let layer_h = layer.height() as i32;
-
-            let is_solid = |x: i32, y: i32| {
-                let x = x.clamp(0, layer_w);
-                let y = y.clamp(0, layer_h);
-                layer.get_tile(x, y).is_some()
-            };
-
-            self.occlusion_segments.clear();
-
-            for x in 0..layer_w {
-                for y in 0..layer_h {
-                    if !is_solid(x, y) {
-                        continue;
-                    }
-
-                    let empty_up = !is_solid(x, y - 1);
-                    let empty_right = !is_solid(x + 1, y);
-                    let empty_down = !is_solid(x, y + 1);
-                    let empty_left = !is_solid(x - 1, y);
-
-                    let (x, y) = (x as f32 - map_w2, (layer_h - 1 - y) as f32 - map_h2);
-
-                    if empty_up {
-                        self.occlusion_segments
-                            .push(Segment::new((x, y + 1.0), (x + 1.0, y + 1.0)).unwrap());
-                    }
-
-                    if empty_right {
-                        self.occlusion_segments
-                            .push(Segment::new((x + 1.0, y), (x + 1.0, y + 1.0)).unwrap());
-                    }
-
-                    if empty_down {
-                        self.occlusion_segments
-                            .push(Segment::new((x, y), (x + 1.0, y)).unwrap());
-                    }
-
-                    if empty_left {
-                        self.occlusion_segments
-                            .push(Segment::new((x, y), (x, y + 1.0)).unwrap());
-                    }
-                }
-            }
+            occluding_layers.push(move |x, y| layer.get_tile(x, y).is_some());
         }
 
-        // Also add map edges
-
-        let (map_w2, map_h2) = (map_w2 + 1.0, map_h2 + 1.0);
-
-        // Top edge
-        self.occlusion_segments
-            .push(Segment::new((-map_w2, map_h2), (map_w2, map_h2)).unwrap());
-
-        // Right edge
-        self.occlusion_segments
-            .push(Segment::new((map_w2, map_h2), (map_w2, -map_h2)).unwrap());
-
-        // Bottom edge
-        self.occlusion_segments
-            .push(Segment::new((map_w2, -map_h2), (-map_w2, -map_h2)).unwrap());
-
-        // Left edge
-        self.occlusion_segments
-            .push(Segment::new((-map_w2, -map_h2), (-map_w2, map_h2)).unwrap());
+        self.occlusion_segments =
+            occlusion_segments(self.inner.width, self.inner.height, &occluding_layers);
 
         Ok(())
     }
@@ -217,4 +155,79 @@ impl Map {
     pub fn visibility_for(&self, point: Point) -> VisibilityPolygon {
         VisibilityPolygon::compute(point, &self.occlusion_segments)
     }
+}
+
+/// Segments between solid and empty tiles of the occluding layers, plus the map edges.
+/// The map is centered on (0, 0), its tiles are 1 unit wide, and `y = 0` is its top row.
+pub fn occlusion_segments(
+    width: u32,
+    height: u32,
+    occluding_layers: &[impl Fn(i32, i32) -> bool],
+) -> Vec<Segment> {
+    let mut segments = Vec::new();
+
+    let map_w2 = width as f32 / 2.0;
+    let map_h2 = height as f32 / 2.0;
+
+    let layer_w = width as i32;
+    let layer_h = height as i32;
+
+    for layer_is_solid in occluding_layers {
+        let is_solid = |x: i32, y: i32| {
+            let x = x.clamp(0, layer_w);
+            let y = y.clamp(0, layer_h);
+            layer_is_solid(x, y)
+        };
+
+        segments.clear();
+
+        for x in 0..layer_w {
+            for y in 0..layer_h {
+                if !is_solid(x, y) {
+                    continue;
+                }
+
+                let empty_up = !is_solid(x, y - 1);
+                let empty_right = !is_solid(x + 1, y);
+                let empty_down = !is_solid(x, y + 1);
+                let empty_left = !is_solid(x - 1, y);
+
+                let (x, y) = (x as f32 - map_w2, (layer_h - 1 - y) as f32 - map_h2);
+
+                if empty_up {
+                    segments.push(Segment::new((x, y + 1.0), (x + 1.0, y + 1.0)).unwrap());
+                }
+
+                if empty_right {
+                    segments.push(Segment::new((x + 1.0, y), (x + 1.0, y + 1.0)).unwrap());
+                }
+
+                if empty_down {
+                    segments.push(Segment::new((x, y), (x + 1.0, y)).unwrap());
+                }
+
+                if empty_left {
+                    segments.push(Segment::new((x, y), (x, y + 1.0)).unwrap());
+                }
+            }
+        }
+    }
+
+    // Also add map edges
+
+    let (map_w2, map_h2) = (map_w2 + 1.0, map_h2 + 1.0);
+
+    // Top edge
+    segments.push(Segment::new((-map_w2, map_h2), (map_w2, map_h2)).unwrap());
+
+    // Right edge
+    segments.push(Segment::new((map_w2, map_h2), (map_w2, -map_h2)).unwrap());
+
+    // Bottom edge
+    segments.push(Segment::new((map_w2, -map_h2), (-map_w2, -map_h2)).unwrap());
+
+    // Left edge
+    segments.push(Segment::new((-map_w2, -map_h2), (-map_w2, map_h2)).unwrap());
+
+    segments
 }

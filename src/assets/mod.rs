@@ -15,6 +15,7 @@ pub use config::Config;
 pub use config::Shape;
 pub use light::LightSource;
 pub use map::Map;
+pub use map::occlusion_segments;
 pub use texture::TextureData;
 pub use texture::TexturePixel;
 pub use tileset::Tileset;
