@@ -3,6 +3,9 @@ mod segment;
 mod torus;
 mod visibility;
 
+#[cfg(test)]
+mod fuzz_segment;
+
 use glam::Vec2;
 
 pub use point::Point;
