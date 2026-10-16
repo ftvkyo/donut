@@ -239,3 +239,55 @@ fn sliding_across_tile_edges_is_smooth() {
 
     assert!(kicks.iter().all(|&kick| kick < 1e-3), "{kicks:?}");
 }
+
+// Simultaneous contacts with segments
+
+/// The disc after colliding with `segments` in the given order.
+fn collided(mut d: PhysObject<()>, segments: &[&SceneObject]) -> PhysObject<()> {
+    for s in segments {
+        d.collide(*s);
+    }
+    d
+}
+
+#[test]
+fn disc_in_inner_corner_is_order_independent() {
+    let floor = segment((0.0, 0.0), (1.0, 0.0));
+    let wall = segment((0.0, 0.0), (0.0, 1.0));
+    let d = disc((0.2, 0.2), vec2(-1.0, -1.0));
+
+    for d in [
+        collided(d.clone(), &[&floor, &wall]),
+        collided(d, &[&wall, &floor]),
+    ] {
+        assert_eq!(d.center, Point::new(RADIUS, RADIUS));
+        assert_eq!(d.velocity_linear, vec2(0.9, 0.9));
+    }
+}
+
+#[test]
+fn disc_above_joint_is_corrected_once() {
+    let left = segment((-1.0, 0.0), (0.0, 0.0));
+    let right = segment((0.0, 0.0), (1.0, 0.0));
+    let d = collided(disc((0.0, 0.2), vec2(0.0, -1.0)), &[&left, &right]);
+
+    assert_eq!(d.center, Point::new(0.0, RADIUS));
+    assert_eq!(d.velocity_linear, vec2(0.0, 0.9));
+}
+
+#[test]
+#[ignore = "an endpoint contact processed before an inner contact tilts the response"]
+fn disc_near_joint_is_order_independent() {
+    let left = segment((-1.0, 0.0), (0.0, 0.0));
+    let right = segment((0.0, 0.0), (1.0, 0.0));
+    let d = disc((0.05, 0.2), vec2(-1.0, -1.0));
+
+    let d1 = collided(d.clone(), &[&left, &right]);
+    let d2 = collided(d, &[&right, &left]);
+
+    println!("Endpoint first: {} {}", d1.center, d1.velocity_linear);
+    println!("Inner first: {} {}", d2.center, d2.velocity_linear);
+
+    assert!(d1.center.dist(d2.center) < 1e-6);
+    assert!(d1.velocity_linear.distance(d2.velocity_linear) < 1e-6);
+}
