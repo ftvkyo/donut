@@ -19,7 +19,7 @@ const STEP: Duration = Duration::from_millis(16);
 const RADIUS: f32 = 0.25;
 
 /// Physics without wrapping anywhere near the scene.
-fn physics<M>() -> Physics<M> {
+fn new_physics<M>() -> Physics<M> {
     Physics::new(
         STEP.as_secs_f32(),
         ToricGeometry {
@@ -56,7 +56,7 @@ fn is_finite(p: Point) -> bool {
 
 /// Seconds simulated by advancing `frames` frames of `frame` each.
 fn simulated_seconds(frame: Duration, frames: u32) -> f32 {
-    let mut physics = physics();
+    let mut physics = new_physics();
     physics.add(disc((0.0, 0.0), Vec2::X));
 
     for _ in 0..frames {
@@ -125,7 +125,7 @@ fn lowest_tunnelling_speed(
         (0..phases).any(|phase| {
             let offset = speed * STEP.as_secs_f32() * phase as f32 / phases as f32;
 
-            let mut physics = physics();
+            let mut physics = new_physics();
             physics.add(disc((0.0, top + 1.0 + offset), vec2(0.0, -speed)));
 
             loop {
@@ -177,4 +177,65 @@ fn fast_disc_does_not_tunnel() {
     println!("Tunnels through a segment at {segment_speed:?} m/s, a wall at {wall_speed:?} m/s");
 
     assert_eq!((segment_speed, wall_speed), (None, None));
+}
+
+// Resting and sliding contact
+
+#[test]
+fn dropped_disc_comes_to_rest() {
+    let floor = [segment((-2.0, 0.0), (2.0, 0.0))];
+
+    let mut physics = new_physics();
+    physics.add(disc((0.0, 1.0), Vec2::ZERO));
+
+    let mut heights = Vec::new();
+    for _ in 0..60_000 / STEP.as_millis() {
+        physics.advance_by(&floor, STEP);
+        heights.push(physics.objects[0].center.y);
+    }
+
+    let d = &physics.objects[0];
+    let settled = heights.iter().rposition(|&y| y != d.center.y).unwrap() + 1;
+    let settled = settled as f32 * STEP.as_secs_f32();
+    let depth = RADIUS - d.center.y;
+    let velocity = d.velocity_linear;
+
+    println!("Settled after {settled} s, {depth} into the floor");
+    println!("Resting with {velocity} m/s at the end of each step");
+
+    assert!(settled < 30.0);
+    assert!(depth.abs() < 1e-3);
+    assert_eq!(d.center.x, 0.0);
+}
+
+/// Largest vertical speed of a disc sliding across `floor` with its top at `y = 0.5`.
+fn sliding_vertical_speed(floor: &[SceneObject], speed: f32) -> f32 {
+    let start = (-1.5 * speed.signum(), 0.5 + RADIUS);
+
+    let mut physics = new_physics();
+    physics.add(disc(start, vec2(speed, 0.0)));
+
+    let mut highest = 0.0f32;
+    for _ in 0..(3.0 / speed.abs() / STEP.as_secs_f32()) as usize {
+        physics.advance_by(floor, STEP);
+        highest = highest.max(physics.objects[0].velocity_linear.y.abs());
+    }
+
+    highest
+}
+
+#[test]
+#[ignore = "endpoints between adjacent tile segments kick a sliding disc"]
+fn sliding_across_tile_edges_is_smooth() {
+    let single = [segment((-2.5, 0.5), (2.5, 0.5))];
+
+    let mut kicks = Vec::new();
+    for speed in [1.0, -1.0, 2.0, -2.0, 5.0, -5.0] {
+        let smooth = sliding_vertical_speed(&single, speed);
+        let tiles = sliding_vertical_speed(&wall(), speed);
+        println!("Sliding at {speed} m/s: |vy| <= {tiles} on tiles, {smooth} on a single segment");
+        kicks.push(tiles - smooth);
+    }
+
+    assert!(kicks.iter().all(|&kick| kick < 1e-3), "{kicks:?}");
 }
