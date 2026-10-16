@@ -6,6 +6,8 @@ mod game;
 pub mod geo;
 mod logging;
 mod phys;
+#[cfg(test)]
+mod testing;
 mod view;
 
 pub use app::App;
