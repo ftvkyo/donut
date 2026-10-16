@@ -109,3 +109,72 @@ fn disc_centred_on_segment_stays_finite() {
         assert!(is_finite(d.center), "{center:?} -> {}", d.center);
     }
 }
+
+// Tunnelling
+
+/// Lowest of `speeds` at which a disc falling onto `scene` ends up below `top`, if any.
+/// Each speed is tried with several phases of the timestep relative to the contact.
+fn lowest_tunnelling_speed(
+    scene: &[SceneObject],
+    top: f32,
+    mut speeds: impl Iterator<Item = f32>,
+) -> Option<f32> {
+    let phases = 16;
+
+    speeds.find(|&speed| {
+        (0..phases).any(|phase| {
+            let offset = speed * STEP.as_secs_f32() * phase as f32 / phases as f32;
+
+            let mut physics = physics();
+            physics.add(disc((0.0, top + 1.0 + offset), vec2(0.0, -speed)));
+
+            loop {
+                physics.advance_by(scene, STEP);
+
+                let d = &physics.objects[0];
+                if d.velocity_linear.y > 0.0 || d.center.y < -5.0 {
+                    break d.center.y < top;
+                }
+            }
+        })
+    })
+}
+
+/// A wide 1-unit-thick wall with its top at `y = 0.5`, and the map edges far away.
+fn wall() -> Vec<SceneObject> {
+    let (width, height) = (5, 15);
+    let mut solid = vec![false; width * height];
+    solid[7 * width..8 * width].fill(true);
+
+    let grid = TileGrid {
+        width: width as u32,
+        height: height as u32,
+        solid,
+    };
+
+    scene(&grid.segments())
+}
+
+#[test]
+fn slow_disc_does_not_tunnel() {
+    let speeds = (1..=60).map(|s| s as f32 * 0.25);
+
+    let s = [segment((-2.0, 0.0), (2.0, 0.0))];
+    assert_eq!(lowest_tunnelling_speed(&s, 0.0, speeds.clone()), None);
+    assert_eq!(lowest_tunnelling_speed(&wall(), 0.5, speeds), None);
+}
+
+#[test]
+#[ignore = "a disc moving more than its radius per step tunnels through segments and walls"]
+fn fast_disc_does_not_tunnel() {
+    let speeds = || (1..=200).map(|s| s as f32 * 0.25);
+
+    let s = [segment((-2.0, 0.0), (2.0, 0.0))];
+    let segment_speed = lowest_tunnelling_speed(&s, 0.0, speeds());
+    let wall_speed = lowest_tunnelling_speed(&wall(), 0.5, speeds());
+
+    println!("Radius per step: {} m/s", RADIUS / STEP.as_secs_f32());
+    println!("Tunnels through a segment at {segment_speed:?} m/s, a wall at {wall_speed:?} m/s");
+
+    assert_eq!((segment_speed, wall_speed), (None, None));
+}
