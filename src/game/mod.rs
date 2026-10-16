@@ -166,3 +166,62 @@ impl<'assets> Game<'assets> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{path::Path, time::Duration};
+
+    use glam::DVec2;
+
+    use crate::{assets::Config, init_logging, phys::object::PhysObjectShape, testing::ray_cast};
+
+    use super::*;
+
+    #[test]
+    fn lights_stay_below_tunnelling_speed() {
+        init_logging();
+        // Tracing every collision makes this take minutes
+        log::set_max_level(log::LevelFilter::Debug);
+
+        let dir_assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+        let config = Config::load(dir_assets.join("config.toml")).unwrap();
+        let assets = Assets::resolve(config, dir_assets).unwrap();
+        let mut game = Game::new(&assets).unwrap();
+
+        // The longest step the physics takes with the game's `max_timestep`
+        let step = Duration::from_millis(16);
+
+        let mut fastest = 0.0f32;
+        let mut tunnelled = 0;
+
+        for _ in 0..60_000 / step.as_millis() {
+            let before: Vec<_> = game.physics.iter().map(|obj| obj.center).collect();
+            game.physics.advance_by(&game.physics_scene, step);
+
+            for (obj, before) in game.physics.iter().zip(before) {
+                fastest = fastest.max(obj.velocity_linear.length());
+
+                // Moves across the wrap seam are ignored
+                let moved = before.dir(obj.center);
+                if moved.length() > 1.0 || moved == Vec2::ZERO {
+                    continue;
+                }
+
+                let dir = DVec2::new(moved.x as f64, moved.y as f64);
+                if ray_cast(before, dir, &game.map.occlusion_segments)
+                    .is_some_and(|(t, _)| t <= moved.length() as f64)
+                {
+                    tunnelled += 1;
+                }
+            }
+        }
+
+        let PhysObjectShape::Disc { radius } = game.physics.iter().next().unwrap().shape;
+        let threshold = radius / step.as_secs_f32();
+        println!("Fastest light: {fastest} m/s, tunnelling from {threshold} m/s");
+        println!("Light centres crossed a segment {tunnelled} times");
+
+        assert!(fastest < threshold);
+        assert_eq!(tunnelled, 0);
+    }
+}
