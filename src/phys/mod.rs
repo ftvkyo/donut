@@ -12,6 +12,8 @@ use crate::{
 
 pub mod collision;
 pub mod object;
+#[cfg(test)]
+mod tests;
 
 pub struct Physics<M> {
     objects: Vec<PhysObject<M>>,
