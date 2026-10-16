@@ -333,4 +333,12 @@ mod tests {
         assert!(grid.is_solid_at(Point::new(0.25, -0.25)));
         assert!(!grid.is_solid_at(Point::new(0.75, -0.25)));
     }
+
+    #[test]
+    #[ignore = "`occlusion_segments` clamps neighbours to the map size, not to its last tile"]
+    fn tile_grid_segments_mirrored() {
+        let left = TileGrid::from_rows(&["#."]).segments().len();
+        let right = TileGrid::from_rows(&[".#"]).segments().len();
+        assert_eq!(left, right);
+    }
 }
