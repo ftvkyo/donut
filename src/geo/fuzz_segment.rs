@@ -11,6 +11,7 @@ use proptest::{collection::vec, prelude::*, sample::select};
 use crate::testing::{TileGrid, ray_cast, tile_grid};
 
 use super::{
+    VisibilityPolygon,
     point::Point,
     segment::{Segment, SegmentByDistance},
 };
@@ -75,6 +76,10 @@ fn crossed(q: Point, through: Point, segments: &[Segment]) -> Vec<(f64, &Segment
             ray_cast(q, dir, std::slice::from_ref(segment)).map(|(t, _)| (t, segment))
         })
         .collect()
+}
+
+fn seg(a: (f32, f32), b: (f32, f32)) -> Segment {
+    Segment::new(a, b).unwrap()
 }
 
 /// A tile map, a ray origin within it, and a point the ray passes through:
@@ -368,4 +373,105 @@ proptest! {
         let segments = disjoint(&ends, GAP);
         check_all(&q, &crossed(q, through, &segments))?;
     }
+}
+
+#[test]
+#[ignore = "cmp is Greater both ways"]
+fn convex_corner_antisymmetric() {
+    // Bottom and right edges of a tile, seen across its corner
+    let bottom = seg((0.0, 0.0), (1.0, 0.0));
+    let right = seg((1.0, 0.0), (1.0, 1.0));
+    let q = Point::new(2.0, -1.0);
+
+    assert_eq!(cmp(&q, &bottom, &right), cmp(&q, &right, &bottom).reverse());
+}
+
+#[test]
+#[ignore = "panics: 'Tried to compare segments that intersect'"]
+fn origin_near_corner() {
+    let bottom = seg((-0.5, -0.5), (0.5, -0.5));
+    let right = seg((0.5, -0.5), (0.5, 0.5));
+    let q = Point::new(0.49995, -0.50005);
+
+    cmp(&q, &bottom, &right);
+}
+
+#[test]
+#[ignore = "panics: 'Tried to compare segments that intersect'"]
+fn visibility_origin_near_corner() {
+    let grid = TileGrid {
+        width: 3,
+        height: 3,
+        solid: vec![false, false, false, false, true, false, false, false, false],
+    };
+
+    VisibilityPolygon::compute(Point::new(0.49995, -0.50005), &grid.segments());
+}
+
+#[test]
+#[ignore = "cmp is Equal"]
+fn short_parallel_segments_ordered() {
+    let near = seg((1.0, -0.005), (1.0, 0.005));
+    let far = seg((1.008, -0.005), (1.008, 0.005));
+
+    assert_eq!(cmp(&Point::ZERO, &near, &far), Ordering::Less);
+}
+
+#[test]
+#[ignore = "the second insert is dropped"]
+fn short_parallel_segments_in_set() {
+    let near = seg((1.0, -0.005), (1.0, 0.005));
+    let far = seg((1.008, -0.005), (1.008, 0.005));
+
+    let set = BTreeSet::from([
+        SegmentByDistance::new(&Point::ZERO, &near),
+        SegmentByDistance::new(&Point::ZERO, &far),
+    ]);
+
+    assert_eq!(set.len(), 2);
+}
+
+#[test]
+#[ignore = "removes the other segment"]
+fn short_parallel_segments_removed_from_set() {
+    let near = seg((1.0, -0.005), (1.0, 0.005));
+    let far = seg((1.008, -0.005), (1.008, 0.005));
+
+    let mut set = BTreeSet::from([SegmentByDistance::new(&Point::ZERO, &near)]);
+
+    assert!(!set.remove(&SegmentByDistance::new(&Point::ZERO, &far)));
+}
+
+#[test]
+#[ignore = "cmp is Less one way and Equal the other"]
+fn short_segment_antisymmetric() {
+    let short = seg((1.0, -0.005), (1.0, 0.005));
+    let long = seg((1.005, -0.5), (1.005, 0.5));
+
+    assert_eq!(cmp(&Point::ZERO, &short, &long), Ordering::Less);
+    assert_eq!(cmp(&Point::ZERO, &long, &short), Ordering::Greater);
+}
+
+#[test]
+#[ignore = "panics: 'S2 can't be on the same line as S1'"]
+fn short_segments_near_t() {
+    // S1 points at the middle of S2 from 0.005 away
+    let s1 = seg((0.005, 0.0), (0.015, 0.0));
+    let s2 = seg((0.0, -0.005), (0.0, 0.005));
+    let q = Point::new(-1.0, -0.404);
+
+    assert_eq!(cmp(&q, &s1, &s2), Ordering::Greater);
+}
+
+#[test]
+#[ignore = "cmp depends on the direction of S2"]
+fn t_junction_ordered() {
+    // S1 ends on the middle of S2, and the ray through (0, 1.5) crosses S1 first
+    let s1 = seg((0.0, 1.0), (0.0, 2.0));
+    let s2 = seg((-1.0, 2.0), (1.0, 2.0));
+    let s2_reversed = seg((1.0, 2.0), (-1.0, 2.0));
+    let q = Point::new(0.5, 0.0);
+
+    assert_eq!(cmp(&q, &s1, &s2), Ordering::Less);
+    assert_eq!(cmp(&q, &s1, &s2_reversed), Ordering::Less);
 }
