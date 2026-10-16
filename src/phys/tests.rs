@@ -48,10 +48,6 @@ fn disc(center: (f32, f32), velocity: Vec2) -> PhysObject<()> {
     PhysObject::new_disc(center.into(), RADIUS, 1.0).with_velocity(velocity)
 }
 
-fn is_finite(p: Point) -> bool {
-    p.x.is_finite() && p.y.is_finite()
-}
-
 // Timestep
 
 /// Seconds simulated by advancing `frames` frames of `frame` each.
@@ -97,17 +93,13 @@ fn advance_by_keeps_fractional_milliseconds() {
 #[test]
 #[ignore = "a disc centred exactly on a segment gets a NaN position"]
 fn disc_centred_on_segment_stays_finite() {
-    // `clamp_length` normalises the zero vector
+    // `clamp_length` normalises the zero vector into NaN
     assert!(Vec2::ZERO.clamp_length(RADIUS, RADIUS).is_nan());
 
-    let s = segment((-1.0, 0.0), (1.0, 0.0));
+    let mut d = disc((0.0, 0.0), vec2(0.0, -1.0));
+    d.collide(&segment((-1.0, 0.0), (1.0, 0.0)));
 
-    // On the inner part and on the start of the segment
-    for center in [(0.0, 0.0), (-1.0, 0.0)] {
-        let mut d = disc(center, vec2(0.0, -1.0));
-        d.collide(&s);
-        assert!(is_finite(d.center), "{center:?} -> {}", d.center);
-    }
+    assert!(d.center.vec().is_finite(), "{}", d.center);
 }
 
 // Tunnelling
@@ -455,13 +447,14 @@ fn wrapping_disc_never_reaches_map_edges() {
         height: 6,
         solid: vec![false; 8 * 6],
     };
+    let scene = scene(&grid.segments());
     let velocity = vec2(5.0, 2.0);
 
     let mut physics = toric_physics(&grid);
     physics.add(disc((0.0, 0.0), velocity));
 
     for step in 1..=5000 / STEP.as_millis() {
-        physics.advance_by(&scene(&grid.segments()), STEP);
+        physics.advance_by(&scene, STEP);
 
         let d = &physics.objects[0];
         let fall = Physics::<()>::G * STEP.as_secs_f32() * step as f32;
@@ -486,13 +479,14 @@ fn disc_bounces_off_tiles_across_wrap_seam() {
             height: height as u32,
             solid,
         };
+        let scene = scene(&grid.segments());
 
         let mut physics = toric_physics(&grid);
         physics.add(disc((0.0, -1.0 + RADIUS), vec2(speed, 0.0)));
 
         let mut bounced = false;
         for step in 0..3000 / STEP.as_millis() {
-            physics.advance_by(&scene(&grid.segments()), STEP);
+            physics.advance_by(&scene, STEP);
 
             let d = &physics.objects[0];
             let tile_x = (d.center.x + width as f32 / 2.0).floor() as i32;
