@@ -5,7 +5,7 @@ use std::{
 };
 
 use glam::vec2;
-use log::trace;
+use log::{Level, log_enabled, trace};
 
 use crate::geo::ImpreciseEq;
 
@@ -169,8 +169,10 @@ impl VisibilityPolygon {
                 event.point_angle.to_degrees(),
             );
 
-            for segment in &segments_active {
-                trace!(" -> There is an active segment: {}", segment.segment);
+            if log_enabled!(Level::Trace) {
+                for segment in &segments_active {
+                    trace!(" -> There is an active segment: {}", segment.segment);
+                }
             }
 
             if event.is_start() {
