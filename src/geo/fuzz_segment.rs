@@ -329,13 +329,6 @@ proptest! {
     }
 
     #[test]
-    #[ignore = "grazing rays: None, or off by more than 1e-3"]
-    fn tile_map_intersect_with_ray((grid, q, through) in tile_scene(12)) {
-        let segments = grid.segments();
-        check_intersect_with_ray(q, through, &crossed(q, through, &segments))?;
-    }
-
-    #[test]
     #[ignore = "panics: 'Tried to compare segments that intersect'"]
     fn tile_map_origin_near_corner(
         (grid, q, through) in tile_scene(12),
@@ -389,6 +382,14 @@ proptest! {
 
 proptest! {
     #![proptest_config(config(ProptestConfig::default().cases))]
+
+    /// Fails in about 3 of 100000 cases.
+    #[test]
+    #[ignore = "grazing rays: None, or off by more than 1e-3"]
+    fn tile_map_intersect_with_ray((grid, q, through) in tile_scene(12)) {
+        let segments = grid.segments();
+        check_intersect_with_ray(q, through, &crossed(q, through, &segments))?;
+    }
 
     #[test]
     #[ignore = "long-running"]
