@@ -359,7 +359,6 @@ fn equal_disc_collision_conserves_energy() {
 }
 
 #[test]
-#[ignore = "swapping projected momenta changes the energy of discs with unequal masses"]
 fn unequal_disc_collision_conserves_energy() {
     let ratios: Vec<_> = [(2.0, 1.0), (1.0, 2.0)]
         .into_iter()

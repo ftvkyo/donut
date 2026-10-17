@@ -138,25 +138,22 @@ impl<M1, M2> CollideWith<&mut PhysObject<M2>> for PhysObject<M1> {
 
                     // TODO: impulse should take angular velocity into account
 
-                    let location = self.center.lerp(with.center, r1 / (r1 + r2));
+                    let Some(normal) = self.center.dir(with.center).try_normalize() else {
+                        return;
+                    };
 
                     // Pretend that `with` is not moving
                     let vel_lin = self.velocity_linear - with.velocity_linear;
+                    let vel_normal = vel_lin.dot(normal);
 
-                    if vel_lin.dot(self.center.dir(location)) > 0.0 {
+                    if vel_normal > 0.0 {
                         // The objects are moving towards each other
 
-                        let momentum_self = self.velocity_linear * self.mass;
-                        let momentum_with = with.velocity_linear * with.mass;
+                        // Elastic collision
+                        let impulse = 2.0 * vel_normal / (1.0 / self.mass + 1.0 / with.mass);
 
-                        let impulse_self = momentum_self.project_onto(self.center.dir(location));
-                        let impulse_with = momentum_with.project_onto(with.center.dir(location));
-
-                        self.velocity_acc.velocity_linear -= impulse_self / self.mass;
-                        self.velocity_acc.velocity_linear += impulse_with / self.mass;
-
-                        with.velocity_acc.velocity_linear -= impulse_with / with.mass;
-                        with.velocity_acc.velocity_linear += impulse_self / with.mass;
+                        self.velocity_acc.velocity_linear -= normal * impulse / self.mass;
+                        with.velocity_acc.velocity_linear += normal * impulse / with.mass;
                     }
                 }
             }
