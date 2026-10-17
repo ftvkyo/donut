@@ -139,6 +139,11 @@ impl GPU {
                 rpass.set_bind_group(index as u32, *group, &[]);
             }
 
+            // Empty buffers cannot be sliced
+            if pass.vdata.get_index_count() == 0 {
+                continue;
+            }
+
             rpass.set_vertex_buffer(0, pass.vdata.get_vertex_buffer().slice(..));
             rpass.set_index_buffer(
                 pass.vdata.get_index_buffer().slice(..),
