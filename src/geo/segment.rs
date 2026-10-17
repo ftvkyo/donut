@@ -43,23 +43,22 @@ impl Segment {
         (self.a, self.b)
     }
 
+    /// Intersects the line defined by the segment with the line defined by the ray.
     pub fn intersect_with_ray(&self, origin: Point, direction: Vec2) -> Option<Point> {
-        let (x1, y1) = self.a.into();
-        let (x2, y2) = self.b.into();
-        let (x3, y3) = origin.into();
-        let (x4, y4) = (origin + direction.into()).into();
+        let ab = self.a.dir(self.b);
+        let denominator = direction.perp_dot(ab);
 
-        let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        // The sine of the angle between the lines
+        let sine = denominator / (direction.length() * ab.length());
 
-        if denominator.is_basically_zero() {
+        if sine.is_nan() || sine.is_basically_zero() {
             // Lines are parallel or coincident
             return None;
         }
 
-        let x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denominator;
-        let y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denominator;
+        let t = origin.dir(self.a).perp_dot(ab) / denominator;
 
-        return Some(Point::new(x, y));
+        return Some(origin + direction * t);
     }
 
     pub fn which_side(&self, point: Point) -> Option<SegmentSide> {

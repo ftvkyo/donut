@@ -145,11 +145,8 @@ categories! {
     light_in_empty_tiles_scaled_by_0_1: in_empty_tiles, Transform::new(0.1, 0.0);
     light_in_empty_tiles_scaled_by_10: in_empty_tiles, Transform::new(10.0, 0.0);
     light_in_empty_tiles_scaled_by_100: in_empty_tiles, Transform::new(100.0, 0.0);
-    #[ignore = "fails 29%: stray and overlapping output segments"]
     light_in_empty_tiles_translated_by_100: in_empty_tiles, Transform::new(1.0, 100.0);
-    #[ignore = "fails 99%: stray and overlapping output segments, gaps"]
     light_in_empty_tiles_translated_by_1000: in_empty_tiles, Transform::new(1.0, 1000.0);
-    #[ignore = "fails 99%: stray output segments"]
     light_in_empty_tiles_translated_by_10000: in_empty_tiles, Transform::new(1.0, 10000.0);
 }
 
@@ -291,31 +288,26 @@ fn light_1e_6_off_corner_of_two_walls() {
 }
 
 #[test]
-#[ignore = "Got a double end. Existing: [-1.5 -1.5], New: [1.5 1.5]"]
 fn light_1e_5_off_end_of_horizontal_wall() {
     regression(&["#"], (-0.50001, -0.50001), Transform::IDENTITY);
 }
 
 #[test]
-#[ignore = "Could not match the remaining points! Remaining start: None, Remaining end: Some(..)"]
 fn light_1e_6_off_end_of_horizontal_wall() {
     regression(&["#"], (-0.49999905, -0.50000095), Transform::IDENTITY);
 }
 
 #[test]
-#[ignore = "Got a double end. Existing: [-1.5 -0.00001], New: [0.5 -1]"]
 fn light_on_wall_line_1e_5_beyond_its_end() {
     regression(&[".", "#"], (0.5, 1e-5), Transform::IDENTITY);
 }
 
 #[test]
-#[ignore = "Got a double start. Existing: [0.5 -0.5], New: [0.5 -0.5]"]
 fn light_1e_5_from_wall_line_beyond_its_end() {
     regression(&["#"], (0.49999046, -0.57826424), Transform::IDENTITY);
 }
 
 #[test]
-#[ignore = "Got a double end. Existing: [-1.5 -0.20370993], New: [0.5  0]"]
 fn light_1e_4_from_wall_line_beyond_its_end() {
     regression(&[".", "#"], (0.4999001, 0.20368958), Transform::IDENTITY);
 }
@@ -327,13 +319,11 @@ fn light_along_row_of_walls_sees_through_its_end() {
 }
 
 #[test]
-#[ignore = "Got a double start. Existing: [0.005 -0.005], New: [0.005 -0.005]"]
 fn light_in_tile_scaled_by_0_01() {
     regression(&["#"], (-0.36707342, -0.6228612), Transform::new(0.01, 0.0));
 }
 
 #[test]
-#[ignore = "Overlapping output segments: [1001.5 1002]<=>[1000.1094 1002] and [1000.5 1001]<=>[1000.5 1000]"]
 fn light_in_tile_translated_by_1000() {
     regression(
         &["#", "."],
@@ -344,7 +334,6 @@ fn light_in_tile_translated_by_1000() {
 
 /// Shrunk from the first panic of `game::tests::lights_have_visibility_for_5_minutes`, at 119 s.
 #[test]
-#[ignore = "Got a double start. Existing: [-14  2], New: [-14  2]"]
 fn light_near_wall_line_below_tile_corner() {
     let segments = [
         Segment::new((-14.0, 2.0), (-14.0, 3.0)).unwrap(),

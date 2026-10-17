@@ -256,7 +256,7 @@ mod tests {
 
     /// `cargo test --release --lib lights_have_visibility -- --ignored`
     #[test]
-    #[ignore = "slow, and panics once in 225000 light updates, at 119 s"]
+    #[ignore = "slow"]
     fn lights_have_visibility_for_5_minutes() {
         let panics = play(300);
         assert!(panics.is_empty(), "{} panics: {panics:#?}", panics.len());

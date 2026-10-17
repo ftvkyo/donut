@@ -266,6 +266,12 @@ fn check_intersect_with_ray(
     let unit = (dvec(through) - dvec(q)).normalize();
 
     for &(t, s) in crossed {
+        // A segment along the ray has no single crossing
+        let (a, b) = s.ab();
+        if [a, b].map(|p| orientation(dvec(q), dvec(through), dvec(p))) == [0.0, 0.0] {
+            continue;
+        }
+
         let expected = dvec(q) + unit * t;
         let point = s.intersect_with_ray(q, q.dir(through));
         prop_assert!(
@@ -377,9 +383,9 @@ proptest! {
         check_all(&q, &crossed(q, through, &segments))?;
     }
 
-    /// Fails in about 3 of 100000 cases.
+    /// Fails in about 7 of 100000 cases.
     #[test]
-    #[ignore = "grazing rays: None, or off by more than 1e-3"]
+    #[ignore = "grazing rays within 1e-4 rad of the line of the segment get None"]
     fn tile_map_intersect_with_ray((grid, q, through) in tile_scene(12)) {
         let segments = grid.segments();
         check_intersect_with_ray(q, through, &crossed(q, through, &segments))?;
@@ -572,7 +578,6 @@ fn which_side_scale_invariant() {
 }
 
 #[test]
-#[ignore = "absolute epsilon on the denominator"]
 fn intersect_with_ray_direction_length() {
     // The ray hits the segment at (5, 0.5) at an angle of 5.7 degrees
     let segment = seg((4.5, 0.5), (5.5, 0.5));
