@@ -90,13 +90,15 @@ fn advance_by_keeps_fractional_milliseconds() {
 // Degenerate contacts
 
 #[test]
-#[ignore = "a disc centred exactly on a segment gets a NaN position"]
 fn disc_centred_on_segment_stays_finite() {
-    // `clamp_length` normalises the zero vector into NaN
     let mut d = disc((0.0, 0.0), vec2(0.0, -1.0));
     d.collide(&segment((-1.0, 0.0), (1.0, 0.0)));
 
     assert!(d.center.vec().is_finite(), "{}", d.center);
+
+    // Pushed back against its velocity
+    assert_eq!(d.center, Point::new(0.0, RADIUS));
+    assert!(d.velocity_linear.y > 0.0, "{}", d.velocity_linear);
 }
 
 // Tunnelling

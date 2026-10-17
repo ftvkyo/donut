@@ -65,10 +65,24 @@ impl<M> CollideWith<&SceneObject> for PhysObject<M> {
                     let mut collision_for = |t: f32| {
                         let location = sa.lerp(sb, t);
 
+                        // From the contact to the center of the disc
+                        let normal = match location.dir(self.center).try_normalize() {
+                            Some(normal) => normal,
+                            // The center is on the segment, so push the disc back against its velocity
+                            None => {
+                                let normal = a_b.perp().normalize();
+                                if normal.dot(self.velocity_linear) > 0.0 {
+                                    -normal
+                                } else {
+                                    normal
+                                }
+                            }
+                        };
+
                         // Moving towards the segment
-                        if self.velocity_linear.dot(self.center.dir(location)) > 0.0 {
+                        if self.velocity_linear.dot(normal) < 0.0 {
                             let momentum = self.velocity_linear * self.mass;
-                            let impulse = momentum.project_onto(self.center.dir(location));
+                            let impulse = momentum.project_onto_normalized(normal);
 
                             // Dampen the impulse a bit
                             let impulse = impulse * 0.95;
@@ -76,8 +90,8 @@ impl<M> CollideWith<&SceneObject> for PhysObject<M> {
                             self.velocity_linear -= 2.0 * impulse / self.mass;
                         }
 
-                        let overlap = radius - self.center.dir(location).length();
-                        self.center += location.dir(self.center).clamp_length(overlap, overlap);
+                        let overlap = radius - location.dist(self.center);
+                        self.center += normal * overlap;
                     };
 
                     // This represents the midpoint of the chord
