@@ -345,7 +345,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "`occlusion_segments` clamps neighbours to the map size, not to its last tile"]
     fn tile_grid_segments_mirrored() {
         let left = TileGrid::from_rows(&["#."]).segments().len();
         let right = TileGrid::from_rows(&[".#"]).segments().len();

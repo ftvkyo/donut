@@ -58,15 +58,14 @@ impl Transform {
     }
 }
 
-/// Checks the visibility of `grid` from `q`, with both transformed by `transform`.
+/// Checks the visibility of `segments` from `q`, with both transformed by `transform`.
 fn check(
-    grid: &TileGrid,
+    segments: &[Segment],
     q: Point,
     transform: Transform,
     extra: &[f64],
 ) -> Result<(), TestCaseError> {
-    let segments: Vec<_> = grid
-        .segments()
+    let segments: Vec<_> = segments
         .iter()
         .map(|s| {
             let (a, b) = s.ab();
@@ -96,7 +95,7 @@ fn property(light: Light, transform: Transform) {
     let mut runner = TestRunner::new(config());
 
     let result = runner.run(&scenes(light), |((grid, q), extra)| {
-        check(&grid, q, transform, &extra)
+        check(&grid.segments(), q, transform, &extra)
     });
 
     match result {
@@ -201,7 +200,7 @@ fn overnight() {
 fn failure(grid: &TileGrid, q: Point, transform: Transform, extra: &[f64]) -> Option<String> {
     let hook = panic::take_hook();
     panic::set_hook(Box::new(|_| ()));
-    let result = panic::catch_unwind(|| check(grid, q, transform, extra));
+    let result = panic::catch_unwind(|| check(&grid.segments(), q, transform, extra));
     panic::set_hook(hook);
 
     match result {
@@ -221,109 +220,147 @@ fn kind(message: &str) -> String {
 }
 
 // Regressions, shrunk from failures of the categories above.
-// The tile of a single-tile map only has walls on its right and bottom.
 
-fn regression(rows: &[&str], q: (f32, f32), transform: Transform) {
+fn regression(segments: Vec<Segment>, q: (f32, f32), transform: Transform) {
     init_logging();
 
-    if let Err(error) = check(&TileGrid::from_rows(rows), q.into(), transform, &[]) {
+    if let Err(error) = check(&segments, q.into(), transform, &[]) {
         panic!("{error}");
     }
 }
 
+fn rows(rows: &[&str]) -> Vec<Segment> {
+    TileGrid::from_rows(rows).segments()
+}
+
+/// A single tile with walls only on its right and bottom, so that their other ends are free.
+fn right_and_bottom_walls() -> Vec<Segment> {
+    let mut segments = vec![
+        Segment::new((0.5, -0.5), (0.5, 0.5)).unwrap(),
+        Segment::new((-0.5, -0.5), (0.5, -0.5)).unwrap(),
+    ];
+    segments.extend(rows(&["."]));
+    segments
+}
+
 #[test]
 fn light_0_012_from_line_of_far_walls() {
-    let rows = ["................#.", "...............#.#"];
-    regression(&rows, (-8.45553, -0.012243271), Transform::IDENTITY);
+    let walls = rows(&["................#.", "...............#.#"]);
+    regression(walls, (-8.45553, -0.012243271), Transform::IDENTITY);
 }
 
 #[test]
 #[ignore = "Origin [0.5  0] is on the segment [0.5 -0.5]<=>[0.5 0.5]"]
 fn light_on_wall() {
-    regression(&["#"], (0.5, 0.0), Transform::IDENTITY);
+    regression(rows(&["#"]), (0.5, 0.0), Transform::IDENTITY);
 }
 
 #[test]
 #[ignore = "Origin [0.500001  0] is on the segment [0.5 -0.5]<=>[0.5 0.5]"]
 fn light_1e_6_from_wall() {
-    regression(&["#"], (0.500001, 0.0), Transform::IDENTITY);
+    regression(rows(&["#"]), (0.500001, 0.0), Transform::IDENTITY);
 }
 
 #[test]
 fn light_1e_4_from_wall() {
-    let grid = TileGrid::from_rows(&["#"]);
-    check(&grid, Point::new(0.5001, 0.0), Transform::IDENTITY, &[]).unwrap();
+    check(
+        &rows(&["#"]),
+        Point::new(0.5001, 0.0),
+        Transform::IDENTITY,
+        &[],
+    )
+    .unwrap();
 }
 
 #[test]
 #[ignore = "Origin [ 0 9.9995] is on the segment [-17 10]<=>[17 10]"]
 fn light_5e_4_from_map_edge() {
     let empty = ".".repeat(32);
-    regression(&[empty.as_str(); 18], (0.0, 9.9995), Transform::IDENTITY);
+    regression(
+        rows(&[empty.as_str(); 18]),
+        (0.0, 9.9995),
+        Transform::IDENTITY,
+    );
 }
 
 #[test]
-#[ignore = "Tried to compare segments that intersect: S1=[0.5 -0.5]<=>[0.5 0.5], S2=[-0.5 -0.5]<=>[0.5 -0.5]"]
+#[ignore = "Origin [0.5 -0.5] is on the segment [-0.5 -0.5]<=>[0.5 -0.5]"]
 fn light_on_corner_of_two_walls() {
-    regression(&["#"], (0.5, -0.5), Transform::IDENTITY);
+    regression(rows(&["#"]), (0.5, -0.5), Transform::IDENTITY);
 }
 
 #[test]
-#[ignore = "Got a double start. Existing: [-1.5 1.5], New: [0.5 0.5]"]
+#[ignore = "Got a double end. Existing: [-1.5 -1.5], New: [1.5 1.5]"]
 fn light_on_end_of_vertical_wall() {
-    regression(&["#"], (0.5, 0.5), Transform::IDENTITY);
+    regression(right_and_bottom_walls(), (0.5, 0.5), Transform::IDENTITY);
 }
 
 #[test]
 fn light_on_end_of_horizontal_wall() {
-    regression(&["#"], (-0.5, -0.5), Transform::IDENTITY);
+    regression(right_and_bottom_walls(), (-0.5, -0.5), Transform::IDENTITY);
 }
 
 #[test]
-#[ignore = "Got a double start. Existing: [1.5 -1.5], New: [0.5 -0.5]"]
+#[ignore = "Tried to compare segments that intersect: S1=[-0.5 -0.5]<=>[0.5 -0.5], S2=[0.5 -0.5]<=>[0.5 0.5]"]
 fn light_1e_6_off_corner_of_two_walls() {
-    regression(&["#"], (0.49999905, -0.50000095), Transform::IDENTITY);
+    regression(rows(&["#"]), (0.49999905, -0.50000095), Transform::IDENTITY);
 }
 
 #[test]
 fn light_1e_5_off_end_of_horizontal_wall() {
-    regression(&["#"], (-0.50001, -0.50001), Transform::IDENTITY);
+    regression(
+        right_and_bottom_walls(),
+        (-0.50001, -0.50001),
+        Transform::IDENTITY,
+    );
 }
 
 #[test]
 fn light_1e_6_off_end_of_horizontal_wall() {
-    regression(&["#"], (-0.49999905, -0.50000095), Transform::IDENTITY);
+    regression(
+        right_and_bottom_walls(),
+        (-0.49999905, -0.50000095),
+        Transform::IDENTITY,
+    );
 }
 
 #[test]
 fn light_on_wall_line_1e_5_beyond_its_end() {
-    regression(&[".", "#"], (0.5, 1e-5), Transform::IDENTITY);
+    regression(rows(&[".", "#"]), (0.5, 1e-5), Transform::IDENTITY);
 }
 
 #[test]
 fn light_1e_5_from_wall_line_beyond_its_end() {
-    regression(&["#"], (0.49999046, -0.57826424), Transform::IDENTITY);
+    regression(rows(&["#"]), (0.49999046, -0.57826424), Transform::IDENTITY);
 }
 
 #[test]
 fn light_1e_4_from_wall_line_beyond_its_end() {
-    regression(&[".", "#"], (0.4999001, 0.20368958), Transform::IDENTITY);
+    regression(
+        rows(&[".", "#"]),
+        (0.4999001, 0.20368958),
+        Transform::IDENTITY,
+    );
 }
 
 #[test]
 fn light_along_row_of_walls_sees_through_its_end() {
-    regression(&["####"], (-2.001, -0.49900007), Transform::IDENTITY);
+    regression(rows(&["####"]), (-2.001, -0.49900007), Transform::IDENTITY);
 }
 
 #[test]
 fn light_in_tile_scaled_by_0_01() {
-    regression(&["#"], (-0.36707342, -0.6228612), Transform::new(0.01, 0.0));
+    regression(
+        right_and_bottom_walls(),
+        (-0.36707342, -0.6228612),
+        Transform::new(0.01, 0.0),
+    );
 }
 
 #[test]
 fn light_in_tile_translated_by_1000() {
     regression(
-        &["#", "."],
+        rows(&["#", "."]),
         (0.9500193, -0.1683228),
         Transform::new(1.0, 1000.0),
     );

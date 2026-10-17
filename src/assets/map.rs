@@ -158,6 +158,7 @@ impl Map {
 }
 
 /// Segments between solid and empty tiles of the occluding layers, plus the map edges.
+/// A tile is solid if it is solid in any occluding layer, and tiles outside the map are empty.
 /// The map is centered on (0, 0), its tiles are 1 unit wide, and `y = 0` is its top row.
 pub fn occlusion_segments(
     width: u32,
@@ -172,45 +173,41 @@ pub fn occlusion_segments(
     let layer_w = width as i32;
     let layer_h = height as i32;
 
-    for layer_is_solid in occluding_layers {
-        // FIXME: neighbours left of and above the map count as solid, right of and below it as empty
-        let is_solid = |x: i32, y: i32| {
-            let x = x.clamp(0, layer_w);
-            let y = y.clamp(0, layer_h);
-            layer_is_solid(x, y)
-        };
+    let is_solid = |x: i32, y: i32| {
+        (0..layer_w).contains(&x)
+            && (0..layer_h).contains(&y)
+            && occluding_layers
+                .iter()
+                .any(|layer_is_solid| layer_is_solid(x, y))
+    };
 
-        // FIXME: only the last occluding layer survives
-        segments.clear();
+    for x in 0..layer_w {
+        for y in 0..layer_h {
+            if !is_solid(x, y) {
+                continue;
+            }
 
-        for x in 0..layer_w {
-            for y in 0..layer_h {
-                if !is_solid(x, y) {
-                    continue;
-                }
+            let empty_up = !is_solid(x, y - 1);
+            let empty_right = !is_solid(x + 1, y);
+            let empty_down = !is_solid(x, y + 1);
+            let empty_left = !is_solid(x - 1, y);
 
-                let empty_up = !is_solid(x, y - 1);
-                let empty_right = !is_solid(x + 1, y);
-                let empty_down = !is_solid(x, y + 1);
-                let empty_left = !is_solid(x - 1, y);
+            let (x, y) = (x as f32 - map_w2, (layer_h - 1 - y) as f32 - map_h2);
 
-                let (x, y) = (x as f32 - map_w2, (layer_h - 1 - y) as f32 - map_h2);
+            if empty_up {
+                segments.push(Segment::new((x, y + 1.0), (x + 1.0, y + 1.0)).unwrap());
+            }
 
-                if empty_up {
-                    segments.push(Segment::new((x, y + 1.0), (x + 1.0, y + 1.0)).unwrap());
-                }
+            if empty_right {
+                segments.push(Segment::new((x + 1.0, y), (x + 1.0, y + 1.0)).unwrap());
+            }
 
-                if empty_right {
-                    segments.push(Segment::new((x + 1.0, y), (x + 1.0, y + 1.0)).unwrap());
-                }
+            if empty_down {
+                segments.push(Segment::new((x, y), (x + 1.0, y)).unwrap());
+            }
 
-                if empty_down {
-                    segments.push(Segment::new((x, y), (x + 1.0, y)).unwrap());
-                }
-
-                if empty_left {
-                    segments.push(Segment::new((x, y), (x, y + 1.0)).unwrap());
-                }
+            if empty_left {
+                segments.push(Segment::new((x, y), (x, y + 1.0)).unwrap());
             }
         }
     }
