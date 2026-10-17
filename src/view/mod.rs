@@ -236,6 +236,10 @@ impl View {
     }
 
     pub fn resize(&mut self) -> Result<()> {
+        if self.window.is_empty() {
+            return Ok(());
+        }
+
         self.window.configure(&self.gpu);
 
         self.gpu_data.depth.update(&self.gpu, self.window.size())?;
@@ -256,6 +260,10 @@ impl View {
     }
 
     pub fn update_camera(&self, game: &Game) -> Result<()> {
+        if self.window.is_empty() {
+            return Ok(());
+        }
+
         let camera_view = game.camera.matrix_view();
         let camera_proj = game.camera.matrix_proj(self.window.size());
 
@@ -281,6 +289,10 @@ impl View {
     }
 
     pub fn render(&mut self) -> Result<()> {
+        if self.window.is_empty() {
+            return Ok(());
+        }
+
         let (window_texture, window_view) = match self.window.texture() {
             Ok(texture) => texture,
             // Skip the frame, after reconfiguring the surface if it changed

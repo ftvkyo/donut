@@ -70,6 +70,12 @@ impl Window {
         self.window.inner_size()
     }
 
+    /// Whether the window has no area to render to, e.g. when minimised.
+    pub fn is_empty(&self) -> bool {
+        let size = self.size();
+        size.width == 0 || size.height == 0
+    }
+
     pub fn output_format(&self) -> wgpu::TextureFormat {
         self.surface_view_format
     }
