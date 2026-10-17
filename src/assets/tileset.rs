@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use image::ImageReader;
 use log::debug;
 
@@ -57,6 +57,12 @@ impl Tileset {
 
         debug!("Loading '{}'...", texture_specular.to_string_lossy());
         let texture_specular = ImageReader::open(texture_specular)?.decode()?.into_luma8();
+
+        ensure!(
+            texture_specular.dimensions() == texture_normal.dimensions(),
+            "Specular and normal maps of tileset '{}' have different sizes",
+            tileset.name
+        );
 
         let mut texture_normal_specular = texture_normal;
         for (x, y, pixel) in texture_specular.enumerate_pixels() {

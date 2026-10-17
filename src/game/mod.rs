@@ -145,7 +145,7 @@ impl<'assets> Game<'assets> {
     }
 
     pub fn light_quad_data(&self) -> impl ExactSizeIterator<Item = QuadEmitter> {
-        let time_ms = (self.start.elapsed().as_millis() % usize::MAX as u128) as usize;
+        let time_ms = self.start.elapsed().as_millis();
         self.physics.iter().map(move |obj| {
             let pos = obj.center;
             let GameObject::Light {
@@ -156,7 +156,8 @@ impl<'assets> Game<'assets> {
 
             let rot = obj.velocity_linear.to_angle();
 
-            let frame = (time_ms / light_asset.ms_per_frame) % light_asset.frames;
+            let frames_shown = time_ms * light_asset.frames_per_second as u128 / 1000;
+            let frame = (frames_shown % light_asset.frames as u128) as usize;
             let frame_w = light_asset.frame_size[0] as f32;
             let frame_h = light_asset.frame_size[1] as f32;
 

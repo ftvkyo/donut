@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use glam::{vec2, vec3};
 use winit::dpi::LogicalSize;
 
@@ -62,7 +62,9 @@ impl Map {
                 _ => bail!("Only finite tile layers are supported"),
             };
 
-            quads.extend(self.quads_for_layer(z, &layer));
+            for quad in self.quads_for_layer(z, &layer) {
+                quads.push(quad?);
+            }
         }
 
         Ok(quads)
@@ -72,7 +74,7 @@ impl Map {
         &self,
         z: f32,
         layer: &tiled::FiniteTileLayer<'_>,
-    ) -> impl Iterator<Item = Quad> {
+    ) -> impl Iterator<Item = Result<Quad>> {
         let map_w = self.inner.width;
         let map_h = self.inner.height;
         // Shift all tiles to make (0.0, 0.0) be the map center
@@ -85,9 +87,9 @@ impl Map {
         (0..layer_w).flat_map(move |layer_x| {
             (0..layer_h).filter_map(move |layer_y| {
                 if let Some(layer_tile) = layer.get_tile(layer_x as i32, layer_y as i32) {
-                    assert!(!layer_tile.flip_d);
-                    assert!(!layer_tile.flip_h);
-                    assert!(!layer_tile.flip_v);
+                    if layer_tile.flip_d || layer_tile.flip_h || layer_tile.flip_v {
+                        return Some(Err(anyhow!("Flipped tiles are not supported")));
+                    }
 
                     let tileset = layer_tile.get_tileset();
 
@@ -106,14 +108,14 @@ impl Map {
                     let tex_pos = vec2(tileset_x as f32, tileset_y as f32);
                     let tex_dim = vec2(tileset.tile_width as f32, tileset.tile_height as f32);
 
-                    Some(Quad {
+                    Some(Ok(Quad {
                         pos,
                         dim,
                         rot,
                         tex_num,
                         tex_pos,
                         tex_dim,
-                    })
+                    }))
                 } else {
                     None
                 }

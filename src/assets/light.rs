@@ -11,7 +11,6 @@ pub struct LightSource {
     pub frame_size: [usize; 2],
     pub frames: usize,
     pub frames_per_second: usize,
-    pub ms_per_frame: usize,
     pub texture: TextureData,
     pub shape: Shape,
 }
@@ -33,16 +32,14 @@ impl LightSource {
         debug!("Loading '{}'...", texture.to_string_lossy());
         let texture = ImageReader::open(texture)?.decode()?.into_rgba8();
 
+        ensure!(frames > 0, "Light animation '{name}' has no frames");
         ensure!(texture.width() as usize % frames == 0);
-
-        let ms_per_frame = 1000 / frames_per_second;
 
         Ok(Self {
             name,
             frame_size: [texture.width() as usize / frames, texture.height() as usize],
             frames,
             frames_per_second,
-            ms_per_frame,
             texture,
             shape,
         })
