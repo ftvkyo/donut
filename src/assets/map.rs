@@ -173,12 +173,14 @@ pub fn occlusion_segments(
     let layer_h = height as i32;
 
     for layer_is_solid in occluding_layers {
+        // FIXME: neighbours left of and above the map count as solid, right of and below it as empty
         let is_solid = |x: i32, y: i32| {
             let x = x.clamp(0, layer_w);
             let y = y.clamp(0, layer_h);
             layer_is_solid(x, y)
         };
 
+        // FIXME: only the last occluding layer survives
         segments.clear();
 
         for x in 0..layer_w {
