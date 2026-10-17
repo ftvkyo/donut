@@ -5,7 +5,7 @@ mod window;
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use gpu::GPU;
 use window::Window;
@@ -280,8 +280,16 @@ impl View {
         Ok(())
     }
 
-    pub fn render(&self) -> Result<()> {
-        let (window_texture, window_view) = self.window.texture()?;
+    pub fn render(&mut self) -> Result<()> {
+        let (window_texture, window_view) = match self.window.texture() {
+            Ok(texture) => texture,
+            // Skip the frame, after reconfiguring the surface if it changed
+            Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => return self.resize(),
+            Err(wgpu::SurfaceError::Timeout) => return Ok(()),
+            Err(err) => return Err(err).context("Failed to acquire the next surface texture"),
+        };
+
+        let suboptimal = window_texture.suboptimal;
 
         let rpass_prepare = RenderPass {
             descriptor: &wgpu::RenderPassDescriptor {
@@ -392,6 +400,10 @@ impl View {
 
         self.window.pre_present_notify();
         window_texture.present();
+
+        if suboptimal {
+            self.resize()?;
+        }
 
         Ok(())
     }

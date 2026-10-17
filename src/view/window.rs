@@ -53,11 +53,8 @@ impl Window {
         self.surface.configure(&gpu.device, &surface_config);
     }
 
-    pub fn texture(&self) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView)> {
-        let surface_texture = self
-            .surface
-            .get_current_texture()
-            .context("failed to acquire next swapchain texture")?;
+    pub fn texture(&self) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView), wgpu::SurfaceError> {
+        let surface_texture = self.surface.get_current_texture()?;
 
         let surface_view = surface_texture
             .texture
