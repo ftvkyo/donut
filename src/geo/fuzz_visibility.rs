@@ -168,14 +168,14 @@ fn overnight() {
 
     let mut failures = BTreeMap::<(&str, String), (u32, TileGrid, Point, String)>::new();
 
-    let hook = panic::take_hook();
-    panic::set_hook(Box::new(|_| ()));
-
     for &(name, light, transform) in CATEGORIES {
         let strategy = scenes(light);
 
         for _ in 0..cases {
-            let ((grid, q), extra) = strategy.new_tree(&mut runner).unwrap().current();
+            // A runner counts rejected values over all cases, so each case gets its own
+            let mut case_runner =
+                TestRunner::new_with_rng(runner.config().clone(), runner.new_rng());
+            let ((grid, q), extra) = strategy.new_tree(&mut case_runner).unwrap().current();
 
             let Some(message) = failure(&grid, q, transform, &extra) else {
                 continue;
@@ -193,8 +193,6 @@ fn overnight() {
         }
     }
 
-    panic::set_hook(hook);
-
     for ((name, kind), (count, grid, q, message)) in &failures {
         println!("{name}: {count}/{cases}: {kind}\nSmallest: {q:?} in\n{grid}{message}\n");
     }
@@ -202,9 +200,14 @@ fn overnight() {
     assert!(failures.is_empty(), "{} kinds of failures", failures.len());
 }
 
-/// The message of a failed check or of a panic in it.
+/// The message of a failed check or of a panic in it, which is not printed.
 fn failure(grid: &TileGrid, q: Point, transform: Transform, extra: &[f64]) -> Option<String> {
-    match panic::catch_unwind(|| check(grid, q, transform, extra)) {
+    let hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| ()));
+    let result = panic::catch_unwind(|| check(grid, q, transform, extra));
+    panic::set_hook(hook);
+
+    match result {
         Ok(Ok(())) => None,
         Ok(Err(TestCaseError::Fail(reason) | TestCaseError::Reject(reason))) => {
             Some(reason.message().to_string())
