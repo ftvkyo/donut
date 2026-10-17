@@ -33,7 +33,7 @@ impl<M> Physics<M> {
     }
 
     pub fn advance_by(&mut self, scene: &[SceneObject], time: Duration) {
-        let mut seconds = time.as_millis() as f32 / 1000.0;
+        let mut seconds = time.as_secs_f32();
 
         while seconds > 0.0 {
             let timestep = self.max_timestep.min(seconds);

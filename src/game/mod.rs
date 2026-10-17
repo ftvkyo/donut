@@ -38,7 +38,7 @@ pub struct Game<'assets> {
     physics_scene: Vec<SceneObject>,
 
     start: Instant,
-    last_advance: Instant,
+    last_advance: Option<Instant>,
 }
 
 impl<'assets> Game<'assets> {
@@ -115,14 +115,20 @@ impl<'assets> Game<'assets> {
             physics,
             physics_scene,
             start: Instant::now(),
-            last_advance: Instant::now(),
+            last_advance: None,
         })
     }
 
+    /// Advances the physics by the time since the previous call; the first call only starts the clock.
     pub fn advance(&mut self) {
-        self.physics
-            .advance_by(&self.physics_scene, self.last_advance.elapsed());
-        self.last_advance = Instant::now();
+        let now = Instant::now();
+
+        if let Some(last_advance) = self.last_advance {
+            self.physics
+                .advance_by(&self.physics_scene, now - last_advance);
+        }
+
+        self.last_advance = Some(now);
     }
 
     pub fn light_deferred_data(&self) -> impl ExactSizeIterator<Item = DeferredLight> {

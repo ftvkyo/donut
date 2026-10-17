@@ -69,7 +69,6 @@ fn advance_by_whole_milliseconds_is_exact() {
 }
 
 #[test]
-#[ignore = "advance_by truncates frame durations to whole milliseconds"]
 fn advance_by_keeps_fractional_milliseconds() {
     let frames = 1000;
 
