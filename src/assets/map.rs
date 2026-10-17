@@ -346,3 +346,81 @@ fn tile_edges(
     out
 }
 
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use proptest::{prelude::*, test_runner::RngSeed};
+
+    use crate::testing::{TileGrid, tile_grid};
+
+    use super::*;
+
+    /// Ends of a unit edge, in half units so that they are integers.
+    type UnitEdge = [(i32, i32); 2];
+
+    fn unit_edge(a: (f32, f32), b: (f32, f32)) -> UnitEdge {
+        let half_units = |(x, y): (f32, f32)| ((x * 2.0) as i32, (y * 2.0) as i32);
+        let mut edge = [half_units(a), half_units(b)];
+        edge.sort();
+        edge
+    }
+
+    /// Unit edges between solid and empty tiles, with the same coordinates as `collision_segments`.
+    fn unit_edges(grid: &TileGrid) -> BTreeSet<UnitEdge> {
+        let (w2, h2) = (grid.width as f32 / 2.0, grid.height as f32 / 2.0);
+        let mut edges = BTreeSet::new();
+
+        for x in 0..grid.width as i32 {
+            for y in 0..grid.height as i32 {
+                if !grid.is_solid(x, y) {
+                    continue;
+                }
+
+                let (left, bottom) = (x as f32 - w2, (grid.height as i32 - 1 - y) as f32 - h2);
+                let (right, top) = (left + 1.0, bottom + 1.0);
+
+                for (dx, dy, a, b) in [
+                    (0, -1, (left, top), (right, top)),
+                    (1, 0, (right, bottom), (right, top)),
+                    (0, 1, (left, bottom), (right, bottom)),
+                    (-1, 0, (left, bottom), (left, top)),
+                ] {
+                    if !grid.is_solid(x + dx, y + dy) {
+                        edges.insert(unit_edge(a, b));
+                    }
+                }
+            }
+        }
+
+        edges
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig {
+            failure_persistence: None,
+            rng_seed: RngSeed::Fixed(0),
+            ..ProptestConfig::default()
+        })]
+
+        #[test]
+        fn collision_segments_join_unit_edges(grid in tile_grid(12, 0.4)) {
+            let segments =
+                collision_segments(grid.width, grid.height, &[|x, y| grid.is_solid(x, y)]);
+
+            let mut joined = BTreeSet::new();
+            for segment in &segments {
+                let (a, b) = segment.ab();
+                let units = a.dist(b).round() as i32;
+                let step = a.dir(b) / units as f32;
+
+                for i in 0..units {
+                    let (a, b) = (a + step * i as f32, a + step * (i + 1) as f32);
+                    prop_assert!(joined.insert(unit_edge(a.into(), b.into())), "Overlap at {segment}");
+                }
+            }
+
+            prop_assert_eq!(joined, unit_edges(&grid));
+        }
+    }
+}
