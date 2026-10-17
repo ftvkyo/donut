@@ -2,10 +2,11 @@ use std::f32::consts::FRAC_1_SQRT_2;
 
 use glam::Vec2;
 
-use crate::geo::{Point, Segment};
+use crate::geo::{Point, Segment, compute_visibility};
 
 /// Segments near each point of an integer grid, so that the visibility up to `radius` from a point
 /// can be computed from the few segments near the grid point closest to it.
+/// Segments are one-sided: they only stop light that reaches them from their left.
 pub struct SegmentBuckets {
     x_min: i32,
     y_min: i32,
@@ -16,6 +17,9 @@ pub struct SegmentBuckets {
 }
 
 impl SegmentBuckets {
+    /// Distance at which lights are kept off segments
+    const CLEARANCE: f32 = 1e-3;
+
     /// Covers points from `min` to `max`.
     /// `segments` must not intersect except at their endpoints, and must include all segments
     /// within `radius` of the covered points.
@@ -49,6 +53,7 @@ impl SegmentBuckets {
                 }
                 let (lo, hi) = (lo - Vec2::ONE, hi + Vec2::ONE);
 
+                // Counter-clockwise, so that the inside is on the left
                 let corners = [(lo.x, lo.y), (hi.x, lo.y), (hi.x, hi.y), (lo.x, hi.y)];
                 for i in 0..corners.len() {
                     let next = (i + 1) % corners.len();
@@ -69,7 +74,7 @@ impl SegmentBuckets {
     }
 
     /// Segments that can be seen within `radius` of `point`, or `None` if it is not covered.
-    pub fn get(&self, point: Point) -> Option<&[Segment]> {
+    fn get(&self, point: Point) -> Option<&[Segment]> {
         let x = point.x.round() as i32 - self.x_min;
         let y = point.y.round() as i32 - self.y_min;
 
@@ -78,5 +83,38 @@ impl SegmentBuckets {
         }
 
         Some(&self.buckets[(x * self.height + y) as usize])
+    }
+
+    /// Visibility polygon of a light at `point`, exact up to `radius` from it,
+    /// or `None` if `point` is not covered.
+    /// A light within `CLEARANCE` of a segment is moved off it to its left,
+    /// and a light right of a segment sees through it.
+    pub fn visibility(&self, point: Point) -> Option<Vec<Segment>> {
+        let bucket = self.get(point)?;
+        let origin = self.clear_of_segments(point)?;
+
+        let facing: Vec<Segment> = bucket
+            .iter()
+            .filter(|segment| segment.signed_dist(origin) > 0.0)
+            .cloned()
+            .collect();
+
+        Some(compute_visibility(origin, &facing))
+    }
+
+    /// `point` moved off the segments within `CLEARANCE` of it, to their left,
+    /// or `None` if it is not covered.
+    pub(crate) fn clear_of_segments(&self, point: Point) -> Option<Point> {
+        let mut origin = point;
+
+        for segment in self.get(point)? {
+            let dist = segment.signed_dist(origin);
+            if dist < Self::CLEARANCE && segment.dist(origin) < Self::CLEARANCE {
+                let (a, b) = segment.ab();
+                origin += a.dir(b).normalize().perp() * (Self::CLEARANCE - dist);
+            }
+        }
+
+        Some(origin)
     }
 }

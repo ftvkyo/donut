@@ -3,7 +3,7 @@ use std::{hint::black_box, path::Path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use donut::{
     Assets, Config,
-    geo::{Point, SegmentBuckets, compute_visibility},
+    geo::{Point, SegmentBuckets},
     occlusion_buckets,
 };
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -121,7 +121,7 @@ impl Cave {
 
 fn compute_all(lights: &[Point], occlusion: &SegmentBuckets) {
     for &light in lights {
-        black_box(compute_visibility(light, occlusion.get(light).unwrap()));
+        black_box(occlusion.visibility(light).unwrap());
     }
 }
 

@@ -5,7 +5,7 @@ use glam::{vec2, vec3};
 use winit::dpi::LogicalSize;
 
 use crate::{
-    geo::{Point, Segment, SegmentBuckets, compute_visibility},
+    geo::{Point, Segment, SegmentBuckets},
     view::Quad,
 };
 
@@ -152,8 +152,7 @@ impl Map {
     /// Visibility polygon of a light at `point`, exact up to `max_visibility` from it,
     /// or `None` if `point` is further than `max_visibility` outside the map.
     pub fn visibility_for(&self, point: Point) -> Option<Vec<Segment>> {
-        let segments = self.occlusion.get(point)?;
-        Some(compute_visibility(point, segments))
+        self.occlusion.visibility(point)
     }
 }
 
@@ -254,6 +253,7 @@ pub fn occlusion_buckets(
 
 /// Edges between solid and empty tiles in `xs` by `ys` of a map of `width` by `height` tiles,
 /// with aligned edges of neighbouring tiles joined into one segment.
+/// Empty tiles are on the left of each segment.
 fn tile_edges(
     width: u32,
     height: u32,
@@ -281,7 +281,7 @@ fn tile_edges(
             if is_empty || is_last || !left_is_empty {
                 // Commit left
                 if let Some(y_left) = y_left.take() {
-                    out.push(Segment::new((map_x(x), y_left), (map_x(x), map_y(y))).unwrap());
+                    out.push(Segment::new((map_x(x), map_y(y)), (map_x(x), y_left)).unwrap());
                 }
             }
 
@@ -329,7 +329,7 @@ fn tile_edges(
                 // Commit down
                 if let Some(x_down) = x_down.take() {
                     out.push(
-                        Segment::new((x_down, map_y(y + 1)), (map_x(x), map_y(y + 1))).unwrap(),
+                        Segment::new((map_x(x), map_y(y + 1)), (x_down, map_y(y + 1))).unwrap(),
                     );
                 }
             }
@@ -353,11 +353,11 @@ fn tile_edges(
 mod tests {
     use std::collections::BTreeSet;
 
-    use proptest::{prelude::*, test_runner::RngSeed};
+    use proptest::{prelude::*, sample::select, test_runner::RngSeed};
 
     use glam::DVec2;
 
-    use crate::testing::{TileGrid, ray_cast, tile_grid};
+    use crate::testing::{TileGrid, ray_cast, sample_directions, tile_grid};
 
     use super::*;
 
@@ -455,11 +455,10 @@ mod tests {
             );
 
             let buckets = occlusion_buckets(grid.width, grid.height, &[is_solid], MAX_VISIBILITY);
-            let Some(bucket) = buckets.get(q) else {
+            let Some(polygon) = buckets.visibility(q) else {
                 // Further outside the map than the lights that are lit
                 return Ok(());
             };
-            let polygon = compute_visibility(q, bucket);
 
             let margin = (MAX_VISIBILITY * 3.0) as i32;
             let all = tile_edges(grid.width, grid.height, -margin..w + margin, -margin..h + margin, is_solid);
@@ -467,6 +466,78 @@ mod tests {
             for angle in angles {
                 let dir = DVec2::from_angle(angle);
                 let expected = ray_cast(q, dir, &all).map_or(f64::INFINITY, |(t, _)| t);
+                let got = ray_cast(q, dir, &polygon).map_or(f64::INFINITY, |(t, _)| t);
+
+                if expected.min(got) < MAX_VISIBILITY as f64 {
+                    prop_assert!(
+                        (expected - got).abs() < 1e-3,
+                        "From {q} at angle {angle}: expected a hit at {expected}, got {got}"
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn collision_segments_have_empty_tiles_on_their_left(grid in tile_grid(12, 0.4)) {
+            let segments =
+                collision_segments(grid.width, grid.height, &[|x, y| grid.is_solid(x, y)]);
+
+            for segment in &segments {
+                let (a, b) = segment.ab();
+                let left = a.dir(b).normalize().perp() * 0.25;
+                let middle = a.midpoint(b);
+
+                prop_assert!(!grid.is_solid_at(middle + left), "Solid left of {segment}");
+                prop_assert!(grid.is_solid_at(middle - left), "Empty right of {segment}");
+            }
+        }
+
+        #[test]
+        fn occlusion_buckets_keep_lights_off_walls(
+            (grid, tile, offset) in tile_grid(12, 0.4).prop_flat_map(|grid| {
+                let near = || prop_oneof![
+                    select(vec![0.0, 1e-6, 1e-4, 1e-3, 1.0 - 1e-6, 1.0 - 1e-4, 1.0 - 1e-3]),
+                    0.0f32..1.0,
+                ];
+                (
+                    Just(grid.clone()),
+                    (0..grid.width as i32, 0..grid.height as i32),
+                    (near(), near()),
+                )
+            }),
+            extra in proptest::collection::vec(0.0..std::f64::consts::TAU, 8),
+        ) {
+            let (w, h) = (grid.width as i32, grid.height as i32);
+            let is_solid = |x: i32, y: i32| grid.is_solid(x.rem_euclid(w), y.rem_euclid(h));
+
+            let q = Point::new(
+                tile.0 as f32 - grid.width as f32 / 2.0 + offset.0,
+                (h - 1 - tile.1) as f32 - grid.height as f32 / 2.0 + offset.1,
+            );
+
+            // Lights are in empty tiles, or slightly inside solid ones
+            let near_empty = [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)]
+                .into_iter()
+                .any(|(dx, dy)| !grid.is_solid_at(q + glam::vec2(dx, dy) * 2e-3));
+            if !near_empty {
+                return Ok(());
+            }
+
+            let buckets = occlusion_buckets(grid.width, grid.height, &[is_solid], MAX_VISIBILITY);
+            let polygon = buckets.visibility(q).unwrap();
+
+            // Walls only stop light coming from their left
+            let q = buckets.clear_of_segments(q).unwrap();
+            let margin = (MAX_VISIBILITY * 3.0) as i32;
+            let facing: Vec<Segment> =
+                tile_edges(grid.width, grid.height, -margin..w + margin, -margin..h + margin, is_solid)
+                    .into_iter()
+                    .filter(|segment| segment.signed_dist(q) > 0.0)
+                    .collect();
+
+            for angle in sample_directions(q, facing.iter(), &extra, 1e-2) {
+                let dir = DVec2::from_angle(angle);
+                let expected = ray_cast(q, dir, &facing).map_or(f64::INFINITY, |(t, _)| t);
                 let got = ray_cast(q, dir, &polygon).map_or(f64::INFINITY, |(t, _)| t);
 
                 if expected.min(got) < MAX_VISIBILITY as f64 {

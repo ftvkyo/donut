@@ -270,7 +270,7 @@ pub fn distance_to_segment(p: DVec2, segment: &Segment) -> f64 {
 
 /// Directions from `q` (radians in `0..TAU`) that stay further than `tolerance` from the ends
 /// of `segments`: the middle of each free angular range, and those of `extra` that are free.
-fn sample_directions<'s>(
+pub fn sample_directions<'s>(
     q: Point,
     segments: impl Iterator<Item = &'s Segment>,
     extra: &[f64],

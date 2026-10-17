@@ -44,6 +44,12 @@ impl Segment {
         (self.a, self.b)
     }
 
+    /// Distance from the line defined by the segment, positive on its left.
+    pub fn signed_dist(&self, point: Point) -> f32 {
+        let ab = self.a.dir(self.b);
+        ab.perp_dot(self.a.dir(point)) / ab.length()
+    }
+
     pub fn dist(&self, point: Point) -> f32 {
         let ab = self.a.dir(self.b);
         let t = (self.a.dir(point).dot(ab) / ab.length_squared()).clamp(0.0, 1.0);
