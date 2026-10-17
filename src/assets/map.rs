@@ -5,7 +5,7 @@ use glam::{vec2, vec3};
 use winit::dpi::LogicalSize;
 
 use crate::{
-    geo::{Point, Segment, compute_visibility},
+    geo::{Point, Segment, SegmentBuckets, compute_visibility},
     view::Quad,
 };
 
@@ -14,11 +14,15 @@ pub struct Map {
     inner: tiled::Map,
     tileset_map: Vec<usize>,
     collision_segments: Vec<Segment>,
-    occlusion_segments: Vec<Segment>,
+    occlusion: SegmentBuckets,
 }
 
 impl Map {
-    pub(super) fn new(inner: tiled::Map, tileset_map: Vec<usize>) -> Result<Self> {
+    pub(super) fn new(
+        inner: tiled::Map,
+        tileset_map: Vec<usize>,
+        max_visibility: f32,
+    ) -> Result<Self> {
         let name = inner
             .source
             .file_stem()
@@ -29,17 +33,26 @@ impl Map {
 
         ensure!(inner.orientation == tiled::Orientation::Orthogonal);
 
-        let mut s = Self {
+        let collision_segments = collision_segments(
+            inner.width,
+            inner.height,
+            &tile_layers(&inner, "Colliding")?,
+        );
+
+        let occlusion = occlusion_buckets(
+            inner.width,
+            inner.height,
+            &tile_layers(&inner, "Occluding")?,
+            max_visibility,
+        );
+
+        Ok(Self {
             name,
             inner,
             tileset_map,
-            collision_segments: Vec::new(),
-            occlusion_segments: Vec::new(),
-        };
-        s.recalculate_collision_segments()?;
-        s.recalculate_occlusion_segments()?;
-
-        Ok(s)
+            collision_segments,
+            occlusion,
+        })
     }
 
     pub fn size_tiles(&self) -> LogicalSize<u32> {
@@ -132,30 +145,15 @@ impl Map {
         &self.collision_segments
     }
 
-    pub fn occlusion(&self) -> &[Segment] {
-        &self.occlusion_segments
+    pub fn occlusion(&self) -> &SegmentBuckets {
+        &self.occlusion
     }
 
-    pub fn visibility_for(&self, point: Point) -> Vec<Segment> {
-        compute_visibility(point, &self.occlusion_segments)
-    }
-
-    fn recalculate_collision_segments(&mut self) -> Result<()> {
-        let colliding_layers = tile_layers(&self.inner, "Colliding")?;
-
-        self.collision_segments =
-            collision_segments(self.inner.width, self.inner.height, &colliding_layers);
-
-        Ok(())
-    }
-
-    fn recalculate_occlusion_segments(&mut self) -> Result<()> {
-        let occluding_layers = tile_layers(&self.inner, "Occluding")?;
-
-        self.occlusion_segments =
-            occlusion_segments(self.inner.width, self.inner.height, &occluding_layers);
-
-        Ok(())
+    /// Visibility polygon of a light at `point`, exact up to `max_visibility` from it,
+    /// or `None` if `point` is further than `max_visibility` outside the map.
+    pub fn visibility_for(&self, point: Point) -> Option<Vec<Segment>> {
+        let segments = self.occlusion.get(point)?;
+        Some(compute_visibility(point, segments))
     }
 }
 
@@ -208,15 +206,18 @@ pub fn collision_segments(
     tile_edges(width, height, 0..w, 0..h, is_solid)
 }
 
-/// Segments between solid and empty tiles of the occluding layers, with the map repeated
-/// around itself so that light reaches across its edges, plus the edges of the repeated map.
+/// Segments between solid and empty tiles of the occluding layers, in buckets for computing
+/// the visibility polygons of lights up to `max_visibility` outside the map, exact up to
+/// `max_visibility` from them.
+/// The map repeats around itself, so that light reaches across its edges.
 /// A tile is solid if it is solid in any occluding layer.
 /// The map is centered on (0, 0), its tiles are 1 unit wide, and `y = 0` is its top row.
-pub fn occlusion_segments(
+pub fn occlusion_buckets(
     width: u32,
     height: u32,
     occluding_layers: &[impl Fn(i32, i32) -> bool],
-) -> Vec<Segment> {
+    max_visibility: f32,
+) -> SegmentBuckets {
     let (w, h) = (width as i32, height as i32);
 
     let is_solid = |x: i32, y: i32| {
@@ -228,25 +229,27 @@ pub fn occlusion_segments(
             .any(|layer_is_solid| layer_is_solid(x, y))
     };
 
-    let mut segments = tile_edges(width, height, -w..w * 2, -h..h * 2, is_solid);
+    // Buckets reach up to a tile further than the lights they serve
+    let margin = (max_visibility * 2.0).ceil() as i32 + 2;
+    let segments = tile_edges(
+        width,
+        height,
+        -margin..w + margin,
+        -margin..h + margin,
+        is_solid,
+    );
 
-    // Also add map edges
+    let corner = Point::new(
+        width as f32 / 2.0 + max_visibility,
+        height as f32 / 2.0 + max_visibility,
+    );
 
-    let (map_w2, map_h2) = (width as f32 * 1.5 + 1.0, height as f32 * 1.5 + 1.0);
-
-    // Top edge
-    segments.push(Segment::new((-map_w2, map_h2), (map_w2, map_h2)).unwrap());
-
-    // Right edge
-    segments.push(Segment::new((map_w2, map_h2), (map_w2, -map_h2)).unwrap());
-
-    // Bottom edge
-    segments.push(Segment::new((map_w2, -map_h2), (-map_w2, -map_h2)).unwrap());
-
-    // Left edge
-    segments.push(Segment::new((-map_w2, -map_h2), (-map_w2, map_h2)).unwrap());
-
-    segments
+    SegmentBuckets::new(
+        &segments,
+        Point::ZERO - corner.vec(),
+        corner,
+        max_visibility,
+    )
 }
 
 /// Edges between solid and empty tiles in `xs` by `ys` of a map of `width` by `height` tiles,
@@ -352,9 +355,13 @@ mod tests {
 
     use proptest::{prelude::*, test_runner::RngSeed};
 
-    use crate::testing::{TileGrid, tile_grid};
+    use glam::DVec2;
+
+    use crate::testing::{TileGrid, ray_cast, tile_grid};
 
     use super::*;
+
+    const MAX_VISIBILITY: f32 = 4.0;
 
     /// Ends of a unit edge, in half units so that they are integers.
     type UnitEdge = [(i32, i32); 2];
@@ -421,6 +428,54 @@ mod tests {
             }
 
             prop_assert_eq!(joined, unit_edges(&grid));
+        }
+
+        #[test]
+        fn occlusion_buckets_see_like_all_segments(
+            (grid, tile, offset) in tile_grid(12, 0.4).prop_flat_map(|grid| {
+                let (w, h) = (grid.width as i32, grid.height as i32);
+                let reach = MAX_VISIBILITY as i32;
+                (
+                    Just(grid),
+                    (-reach..w + reach, -reach..h + reach),
+                    (0.01f32..0.99, 0.01f32..0.99),
+                )
+            }),
+            angles in proptest::collection::vec(0.0..std::f64::consts::TAU, 32),
+        ) {
+            let (w, h) = (grid.width as i32, grid.height as i32);
+            let is_solid = |x: i32, y: i32| grid.is_solid(x.rem_euclid(w), y.rem_euclid(h));
+            if is_solid(tile.0, tile.1) {
+                return Ok(());
+            }
+
+            let q = Point::new(
+                tile.0 as f32 - grid.width as f32 / 2.0 + offset.0,
+                (h - 1 - tile.1) as f32 - grid.height as f32 / 2.0 + offset.1,
+            );
+
+            let buckets = occlusion_buckets(grid.width, grid.height, &[is_solid], MAX_VISIBILITY);
+            let Some(bucket) = buckets.get(q) else {
+                // Further outside the map than the lights that are lit
+                return Ok(());
+            };
+            let polygon = compute_visibility(q, bucket);
+
+            let margin = (MAX_VISIBILITY * 3.0) as i32;
+            let all = tile_edges(grid.width, grid.height, -margin..w + margin, -margin..h + margin, is_solid);
+
+            for angle in angles {
+                let dir = DVec2::from_angle(angle);
+                let expected = ray_cast(q, dir, &all).map_or(f64::INFINITY, |(t, _)| t);
+                let got = ray_cast(q, dir, &polygon).map_or(f64::INFINITY, |(t, _)| t);
+
+                if expected.min(got) < MAX_VISIBILITY as f64 {
+                    prop_assert!(
+                        (expected - got).abs() < 1e-3,
+                        "From {q} at angle {angle}: expected a hit at {expected}, got {got}"
+                    );
+                }
+            }
         }
     }
 }

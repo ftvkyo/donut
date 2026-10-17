@@ -3,12 +3,12 @@ use std::{hint::black_box, path::Path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use donut::{
     Assets, Config,
-    geo::{Point, Segment, compute_visibility},
-    occlusion_segments,
+    geo::{Point, SegmentBuckets, compute_visibility},
+    occlusion_buckets,
 };
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-/// Lights per map in the `compute` groups.
+/// Lights per map in the `compute` group.
 const LIGHTS: usize = 16;
 
 /// Empty tiles of `debug-01` as `(x, y)`, `y = 0` is the top row.
@@ -40,29 +40,37 @@ fn light_in_tile(width: u32, height: u32, x: u32, y: u32) -> Point {
     )
 }
 
-struct Map {
+struct Map<'a> {
     name: String,
-    segments: Vec<Segment>,
+    occlusion: &'a SegmentBuckets,
     lights: Vec<Point>,
 }
 
-impl Map {
-    fn debug_01(assets: &Assets) -> Self {
+impl<'a> Map<'a> {
+    fn debug_01(assets: &'a Assets) -> Self {
         let (_, map) = assets.find_map("debug-01").unwrap();
         let size = map.size_tiles();
 
         Self {
             name: map.name.clone(),
-            segments: map.occlusion().iter().map(copy).collect(),
+            occlusion: map.occlusion(),
             lights: DEBUG_01_LIGHTS
                 .iter()
                 .map(|&(x, y)| light_in_tile(size.width, size.height, x, y))
                 .collect(),
         }
     }
+}
 
-    /// Cave-like map: random noise smoothed by a cellular automaton.
-    fn cave(width: u32, height: u32) -> Self {
+/// Cave-like map: random noise smoothed by a cellular automaton.
+struct Cave {
+    name: String,
+    occlusion: SegmentBuckets,
+    lights: Vec<Point>,
+}
+
+impl Cave {
+    fn new(width: u32, height: u32, max_visibility: f32) -> Self {
         let mut rng = StdRng::seed_from_u64(1);
 
         let (w, h) = (width as i32, height as i32);
@@ -97,20 +105,23 @@ impl Map {
 
         Self {
             name: format!("cave-{width}x{height}"),
-            segments: occlusion_segments(width, height, &[is_solid]),
+            occlusion: occlusion_buckets(width, height, &[is_solid], max_visibility),
             lights,
+        }
+    }
+
+    fn map(&self) -> Map<'_> {
+        Map {
+            name: self.name.clone(),
+            occlusion: &self.occlusion,
+            lights: self.lights.clone(),
         }
     }
 }
 
-fn copy(segment: &Segment) -> Segment {
-    let (a, b) = segment.ab();
-    Segment::new(a, b).unwrap()
-}
-
-fn compute_all(lights: &[Point], segments: &[Segment]) {
+fn compute_all(lights: &[Point], occlusion: &SegmentBuckets) {
     for &light in lights {
-        black_box(compute_visibility(light, segments));
+        black_box(compute_visibility(light, occlusion.get(light).unwrap()));
     }
 }
 
@@ -119,19 +130,18 @@ fn bench_visibility(c: &mut Criterion) {
     let config = Config::load(dir_assets.join("config.toml")).unwrap();
     let assets = Assets::resolve(config, dir_assets).unwrap();
 
-    let maps = [
-        Map::debug_01(&assets),
-        Map::cave(64, 36),
-        Map::cave(128, 72),
+    let caves = [
+        Cave::new(64, 36, assets.max_visibility),
+        Cave::new(128, 72, assets.max_visibility),
     ];
+    let maps = [Map::debug_01(&assets), caves[0].map(), caves[1].map()];
 
     // Time per light is the reported time divided by `LIGHTS`
     let mut group = c.benchmark_group("compute");
     group.throughput(Throughput::Elements(LIGHTS as u64));
     for map in &maps {
-        let id = BenchmarkId::new(&map.name, map.segments.len());
-        group.bench_with_input(id, map, |b, map| {
-            b.iter(|| compute_all(&map.lights, &map.segments))
+        group.bench_with_input(BenchmarkId::from_parameter(&map.name), map, |b, map| {
+            b.iter(|| compute_all(&map.lights, map.occlusion))
         });
     }
     group.finish();
@@ -151,7 +161,7 @@ fn bench_visibility(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new(&debug_01.name, count),
             &lights,
-            |b, lights| b.iter(|| compute_all(lights, &debug_01.segments)),
+            |b, lights| b.iter(|| compute_all(lights, debug_01.occlusion)),
         );
     }
     group.finish();

@@ -149,11 +149,14 @@ impl<'assets> Game<'assets> {
                 obj.center + vec2(-w, 0.0),
             ];
 
-            positions.map(|pos| DeferredLight {
-                position: (pos.x, pos.y, 1.0, 1.0).into(),
-                color,
-                radius: self.light_radius,
-                visibility: self.map.visibility_for(pos),
+            // Copies too far outside the map to light it have no visibility
+            positions.into_par_iter().filter_map(move |pos| {
+                Some(DeferredLight {
+                    position: (pos.x, pos.y, 1.0, 1.0).into(),
+                    color,
+                    radius: self.light_radius,
+                    visibility: self.map.visibility_for(pos)?,
+                })
             })
         })
     }
@@ -271,7 +274,12 @@ mod tests {
             time += step;
 
             for obj in game.physics.objects() {
-                if let Err(payload) = panic::catch_unwind(|| game.map.visibility_for(obj.center)) {
+                let visibility = || {
+                    game.map
+                        .visibility_for(obj.center)
+                        .expect("Lights in the map are lit")
+                };
+                if let Err(payload) = panic::catch_unwind(visibility) {
                     panics.push((time, obj.center, panic_message(payload)));
                 }
             }

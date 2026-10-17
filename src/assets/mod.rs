@@ -16,7 +16,7 @@ pub use config::Shape;
 pub use light::LightSource;
 pub use map::Map;
 pub use map::collision_segments;
-pub use map::occlusion_segments;
+pub use map::occlusion_buckets;
 pub use texture::TextureData;
 pub use texture::TexturePixel;
 pub use tileset::Tileset;
@@ -154,7 +154,8 @@ impl Assets {
             }
         }
 
-        self.maps.push(Map::new(map, tileset_map)?);
+        self.maps
+            .push(Map::new(map, tileset_map, self.max_visibility)?);
 
         Ok(())
     }

@@ -22,6 +22,7 @@ impl Display for SegmentSide {
     }
 }
 
+#[derive(Clone)]
 pub struct Segment {
     a: Point,
     b: Point,
@@ -41,6 +42,12 @@ impl Segment {
 
     pub fn ab(&self) -> (Point, Point) {
         (self.a, self.b)
+    }
+
+    pub fn dist(&self, point: Point) -> f32 {
+        let ab = self.a.dir(self.b);
+        let t = (self.a.dir(point).dot(ab) / ab.length_squared()).clamp(0.0, 1.0);
+        point.dist(self.a + ab * t)
     }
 
     /// Intersects the line defined by the segment with the line defined by the ray.

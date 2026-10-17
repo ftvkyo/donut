@@ -11,7 +11,7 @@ mod testing;
 mod view;
 
 pub use app::App;
-pub use assets::{Assets, Config, collision_segments, occlusion_segments};
+pub use assets::{Assets, Config, collision_segments, occlusion_buckets};
 pub use game::Game;
 pub use logging::init_logging;
 

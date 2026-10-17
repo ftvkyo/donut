@@ -1,3 +1,4 @@
+mod buckets;
 #[cfg(test)]
 mod fuzz_segment;
 #[cfg(test)]
@@ -9,6 +10,7 @@ mod visibility;
 
 use glam::Vec2;
 
+pub use buckets::SegmentBuckets;
 pub use point::Point;
 pub use segment::Segment;
 pub use torus::ToricGeometry;
