@@ -34,6 +34,7 @@ pub enum GameObject<'assets> {
 pub struct Game<'assets> {
     pub map: &'assets Map,
     pub camera: Camera,
+    light_radius: f32,
 
     physics: Physics<GameObject<'assets>>,
     physics_scene: Vec<SceneObject>,
@@ -113,6 +114,7 @@ impl<'assets> Game<'assets> {
         Ok(Self {
             map,
             camera,
+            light_radius: assets.max_visibility,
             physics,
             physics_scene,
             start: Instant::now(),
@@ -150,6 +152,7 @@ impl<'assets> Game<'assets> {
             positions.map(|pos| DeferredLight {
                 position: (pos.x, pos.y, 1.0, 1.0).into(),
                 color,
+                radius: self.light_radius,
                 visibility: self.map.visibility_for(pos),
             })
         })

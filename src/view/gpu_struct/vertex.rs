@@ -80,6 +80,7 @@ pub struct VertexDeferred {
     pub pos: [f32; 4],
     pub light_pos: [f32; 4],
     pub light_color: [f32; 4],
+    pub light_radius: f32,
 }
 
 impl VertexDeferred {
@@ -101,6 +102,11 @@ impl VertexDeferred {
                 format: wgpu::VertexFormat::Float32x4,
                 offset: offset_of!(Self, light_color) as u64,
                 shader_location: 2,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32,
+                offset: offset_of!(Self, light_radius) as u64,
+                shader_location: 3,
             },
         ],
     };

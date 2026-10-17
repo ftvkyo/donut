@@ -8,6 +8,8 @@ use crate::{
 pub struct DeferredLight {
     pub position: Vec4,
     pub color: Vec4,
+    /// Distance at which the light fades out
+    pub radius: f32,
     pub visibility: Vec<Segment>,
 }
 
@@ -24,12 +26,14 @@ impl DeferredLight {
                 pos: [p[0], p[1], p[2], 1.0].into(),
                 light_pos: self.position.into(),
                 light_color: self.color.into(),
+                light_radius: self.radius,
             });
 
         std::iter::once(VertexDeferred {
             pos: self.position.into(),
             light_pos: self.position.into(),
             light_color: self.color.into(),
+            light_radius: self.radius,
         })
         .chain(points)
     }

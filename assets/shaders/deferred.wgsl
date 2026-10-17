@@ -5,6 +5,7 @@ struct VertexInput {
     @location(0) pos: vec4<f32>,
     @location(1) light_pos: vec4<f32>,
     @location(2) light_color: vec4<f32>,
+    @location(3) light_radius: f32,
 }
 
 struct VertexOutput {
@@ -12,6 +13,7 @@ struct VertexOutput {
     @location(0) @interpolate(linear) frag_pos: vec4<f32>,
     @location(1) light_pos: vec4<f32>,
     @location(2) light_color: vec4<f32>,
+    @location(3) light_radius: f32,
 };
 
 @group(0) @binding(0)
@@ -27,6 +29,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     result.frag_pos = view * vertex.pos;
     result.light_pos = view * vertex.light_pos;
     result.light_color = vertex.light_color;
+    result.light_radius = vertex.light_radius;
 
     return result;
 }
@@ -63,7 +66,7 @@ fn get_sample(frag_pos_fb: vec2<f32>) -> FragmentSample {
     return result;
 }
 
-fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, frag_specular: f32, light_pos: vec4<f32>, light_color: vec4<f32>) -> vec4<f32> {
+fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, frag_specular: f32, light_pos: vec4<f32>, light_color: vec4<f32>, light_radius: f32) -> vec4<f32> {
     let specular_shininess = pow(2.0, 1.0 + frag_specular * 8.0);
 
     if (light_color.a == 0.0) {
@@ -89,9 +92,11 @@ fn get_light(frag_pos: vec4<f32>, frag_normal: vec3<f32>, frag_specular: f32, li
     // - clamped with 0 from below
     let specular = pow(max(dot(frag_normal, dir_halfway), 0.0), specular_shininess);
 
-    // Decrease the strength of the diffuse and specular components with distance
+    // Decrease the strength of the diffuse and specular components with distance,
+    // fading out smoothly to zero at the radius
     let distance = length((light_pos - frag_pos).xyz);
-    let distance_factor = 1 / (distance * distance);
+    let distance_window = saturate(1.0 - pow(distance / light_radius, 4.0));
+    let distance_factor = distance_window * distance_window / (distance * distance);
 
     return vec4(light_color.rgb, light_color.a * distance_factor * (diffuse + specular));
 }
@@ -101,7 +106,7 @@ fn fs_main(frag: VertexOutput) -> @location(0) vec4<f32> {
     let frag_sample = get_sample(frag.pos.xy);
     let frag_sample_pos = vec4(frag.frag_pos.xy, frag_sample.depth, 1.0);
 
-    let light = get_light(frag_sample_pos, frag_sample.normal, frag_sample.specular, frag.light_pos, frag.light_color);
+    let light = get_light(frag_sample_pos, frag_sample.normal, frag_sample.specular, frag.light_pos, frag.light_color, frag.light_radius);
 
     return vec4(frag_sample.color * light.rgb, light.a);
 }

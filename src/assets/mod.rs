@@ -24,6 +24,8 @@ pub use tileset::TilesetId;
 
 pub struct Assets {
     pub max_timestep: f32,
+    /// How far light reaches
+    pub max_visibility: f32,
 
     lights: Vec<LightSource>,
     shaders: BTreeMap<String, String>,
@@ -35,9 +37,10 @@ pub struct Assets {
 }
 
 impl Assets {
-    fn empty(max_timestep: f32) -> Self {
+    fn empty(max_timestep: f32, max_visibility: f32) -> Self {
         Self {
             max_timestep,
+            max_visibility,
 
             lights: Vec::new(),
             shaders: BTreeMap::new(),
@@ -57,7 +60,7 @@ impl Assets {
             path.to_string_lossy()
         );
 
-        let mut s = Self::empty(config.max_timestep);
+        let mut s = Self::empty(config.max_timestep, config.max_visibility);
 
         let path_lights = path.join("textures");
         for light in config.lights {
