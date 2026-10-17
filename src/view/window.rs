@@ -9,7 +9,6 @@ pub struct Window {
     window: Arc<winit::window::Window>,
     surface: wgpu::Surface<'static>,
     surface_format: wgpu::TextureFormat,
-    surface_view_format: wgpu::TextureFormat,
 }
 
 impl Window {
@@ -26,13 +25,10 @@ impl Window {
             .find(|fmt| fmt.has_color_aspect() && fmt.is_srgb())
             .context("No suitable surface format found")?;
 
-        let surface_view_format = surface_format.remove_srgb_suffix();
-
         Ok(Self {
             window,
             surface,
             surface_format,
-            surface_view_format,
         })
     }
 
@@ -42,7 +38,7 @@ impl Window {
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: self.surface_format,
-            view_formats: vec![self.surface_view_format],
+            view_formats: vec![],
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             width: size.width,
             height: size.height,
@@ -56,12 +52,7 @@ impl Window {
     pub fn texture(&self) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView), wgpu::SurfaceError> {
         let surface_texture = self.surface.get_current_texture()?;
 
-        let surface_view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor {
-                format: Some(self.surface_view_format),
-                ..Default::default()
-            });
+        let surface_view = surface_texture.texture.create_view(&Default::default());
 
         Ok((surface_texture, surface_view))
     }
@@ -77,7 +68,7 @@ impl Window {
     }
 
     pub fn output_format(&self) -> wgpu::TextureFormat {
-        self.surface_view_format
+        self.surface_format
     }
 
     pub fn request_redraw(&self) {

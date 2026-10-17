@@ -68,7 +68,10 @@ impl View {
             for (_, tdata) in assets.all_tilesets() {
                 let tgroup = TextureGroup::new(
                     &gpu,
-                    &[&tdata.texture_color, &tdata.texture_normal_specular],
+                    &[
+                        (&tdata.texture_color, TextureGroup::FORMAT_COLOR),
+                        (&tdata.texture_normal_specular, TextureGroup::FORMAT_DATA),
+                    ],
                 )?;
                 main_tmux.push(tgroup);
             }
@@ -102,7 +105,8 @@ impl View {
 
             let mut light_tmux = Vec::new();
             for (_, tdata) in assets.all_lights() {
-                let tgroup = TextureGroup::new(&gpu, &[&tdata.texture])?;
+                let tgroup =
+                    TextureGroup::new(&gpu, &[(&tdata.texture, TextureGroup::FORMAT_COLOR)])?;
                 light_tmux.push(tgroup);
             }
             let light_emitters_tmux = TextureMultiplexer::new(&gpu, light_tmux)?;

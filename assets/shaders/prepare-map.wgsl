@@ -71,7 +71,7 @@ fn fs_main(frag: VertexOutput) -> FragmentOutput {
         discard;
     }
 
-    let ambient_strength = 0.1;
+    let ambient_strength = 0.01;
 
     var result: FragmentOutput;
     result.color_ambient = vec4(ambient_strength * tex_color.rgb, 1.0);

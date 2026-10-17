@@ -12,16 +12,18 @@ pub struct TextureGroup {
 }
 
 impl TextureGroup {
-    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-    pub const VIEW_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+    /// For colors, which are decoded from sRGB when sampled
+    pub const FORMAT_COLOR: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+    /// For data such as normals, which is sampled as stored
+    pub const FORMAT_DATA: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
-    pub fn new(gpu: &GPU, texture_data: &[&TextureData]) -> Result<Self> {
+    pub fn new(gpu: &GPU, texture_data: &[(&TextureData, wgpu::TextureFormat)]) -> Result<Self> {
         ensure!(texture_data.len() > 0, "at least one texture is expected");
 
-        let dimensions = texture_data[0].dimensions();
+        let dimensions = texture_data[0].0.dimensions();
         ensure!(dimensions.0 > 0, "textures can't be 0 pixels wide");
         ensure!(dimensions.1 > 0, "textures can't be 0 pixels tall");
-        for td in texture_data[1..texture_data.len()].iter() {
+        for (td, _) in texture_data[1..texture_data.len()].iter() {
             ensure!(
                 dimensions == td.dimensions(),
                 "all textures should have the same dimensions"
@@ -44,16 +46,16 @@ impl TextureGroup {
             rows_per_image: None,
         };
 
-        for td in texture_data {
+        for (td, format) in texture_data {
             let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
                 label: None,
                 size,
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                format: Self::FORMAT,
+                format: *format,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[Self::VIEW_FORMAT],
+                view_formats: &[],
             });
 
             gpu.queue.write_texture(
@@ -63,10 +65,7 @@ impl TextureGroup {
                 size,
             );
 
-            let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                format: Some(Self::VIEW_FORMAT),
-                ..Default::default()
-            });
+            let texture_view = texture.create_view(&Default::default());
 
             textures.push((texture, texture_view));
         }

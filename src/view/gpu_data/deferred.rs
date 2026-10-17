@@ -87,7 +87,7 @@ pub struct DeferredTextureGroup {
 }
 
 impl DeferredTextureGroup {
-    pub const FORMAT_COLOR: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+    pub const FORMAT_COLOR: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
     pub const FORMAT_NORMAL_DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
     fn new_texture(
