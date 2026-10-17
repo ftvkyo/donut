@@ -37,7 +37,6 @@ impl TextureGroup {
         };
 
         let bytes_per_row = dimensions.0 * size_of::<TexturePixel>() as u32;
-        ensure!(bytes_per_row % 256 == 0);
 
         let copy_buffer_layout = wgpu::TexelCopyBufferLayout {
             offset: 0,
