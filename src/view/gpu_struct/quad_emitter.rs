@@ -9,7 +9,7 @@ pub struct QuadEmitter {
     /// Width and Height of the quad
     pub dim: Vec2,
     /// Rotation of the quad around the Z axis.
-    /// Positive values correspond to clockwise rotation.
+    /// Positive values correspond to counter-clockwise rotation.
     pub rot: f32,
 
     /// Which texture to use

@@ -9,7 +9,7 @@ pub struct Quad {
     /// Width and Height of the quad
     pub dim: Vec2,
     /// Rotation of the quad around the Z axis.
-    /// Positive values correspond to clockwise rotation.
+    /// Positive values correspond to counter-clockwise rotation.
     // TODO: account for rotation in light calculation (normal map is not rotated)
     pub rot: f32,
 
