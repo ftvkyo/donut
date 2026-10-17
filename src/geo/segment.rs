@@ -236,7 +236,7 @@ impl Ord for SegmentByDistance<'_, '_> {
                                 trace!(" -> S2a is on the {s2a_to_s1} of S1");
                                 trace!(" -> S2b is on the {s2b_to_s1} of S1");
 
-                                if q_to_s1 == s2a_to_s1 && q_to_s1 == s2a_to_s1 {
+                                if q_to_s1 == s2a_to_s1 && q_to_s1 == s2b_to_s1 {
                                     return O::Greater;
                                 }
 

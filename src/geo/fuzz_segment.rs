@@ -529,7 +529,6 @@ fn nearly_parallel() -> (Point, Point, [Segment; 2]) {
 }
 
 #[test]
-#[ignore = "only one end of S2 is checked: Greater"]
 fn s1_straddling_line_of_s2_rounding() {
     let (q, through, segments) = nearly_parallel();
     let [s1, s2] = &segments;
