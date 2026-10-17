@@ -141,15 +141,13 @@ impl<'assets> Game<'assets> {
         self.physics.objects().par_iter().flat_map(move |obj| {
             let GameObject::Light { color, .. } = obj.meta;
 
-            let positions = [
-                obj.center,
-                obj.center + vec2(0.0, h),
-                obj.center + vec2(w, 0.0),
-                obj.center + vec2(0.0, -h),
-                obj.center + vec2(-w, 0.0),
-            ];
+            // The light and its copies in the repeated map around it,
+            // except those too far outside the map to light it, which have no visibility
+            let positions = [-1.0, 0.0, 1.0]
+                .into_iter()
+                .flat_map(|x| [-1.0, 0.0, 1.0].map(|y| obj.center + vec2(x * w, y * h)))
+                .collect::<Vec<_>>();
 
-            // Copies too far outside the map to light it have no visibility
             positions.into_par_iter().filter_map(move |pos| {
                 Some(DeferredLight {
                     position: (pos.x, pos.y, 1.0, 1.0).into(),
