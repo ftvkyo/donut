@@ -136,7 +136,7 @@ impl<'assets> Game<'assets> {
         let map_size = self.map.size_tiles();
         let (w, h) = (map_size.width as f32, map_size.height as f32);
 
-        self.physics.iter().par_bridge().flat_map(move |obj| {
+        self.physics.objects().par_iter().flat_map(move |obj| {
             let GameObject::Light { color, .. } = obj.meta;
 
             let positions = [
@@ -157,7 +157,7 @@ impl<'assets> Game<'assets> {
 
     pub fn light_quad_data(&self) -> impl ExactSizeIterator<Item = QuadEmitter> {
         let time_ms = self.start.elapsed().as_millis();
-        self.physics.iter().map(move |obj| {
+        self.physics.objects().iter().map(move |obj| {
             let pos = obj.center;
             let GameObject::Light {
                 color,
@@ -217,10 +217,15 @@ mod tests {
         let mut tunnelled = 0;
 
         for _ in 0..60_000 / step.as_millis() {
-            let before: Vec<_> = game.physics.iter().map(|obj| obj.center).collect();
+            let before: Vec<_> = game
+                .physics
+                .objects()
+                .iter()
+                .map(|obj| obj.center)
+                .collect();
             game.physics.advance_by(&game.physics_scene, step);
 
-            for (obj, before) in game.physics.iter().zip(before) {
+            for (obj, before) in game.physics.objects().iter().zip(before) {
                 fastest = fastest.max(obj.velocity_linear.length());
 
                 // Moves across the wrap seam are ignored
@@ -238,7 +243,7 @@ mod tests {
             }
         }
 
-        let PhysObjectShape::Disc { radius } = game.physics.iter().next().unwrap().shape;
+        let PhysObjectShape::Disc { radius } = game.physics.objects()[0].shape;
         let threshold = radius / step.as_secs_f32();
         println!("Fastest light: {fastest} m/s, tunnelling from {threshold} m/s");
         println!("Light centres crossed a segment {tunnelled} times");
@@ -262,7 +267,7 @@ mod tests {
             game.physics.advance_by(&game.physics_scene, step);
             time += step;
 
-            for obj in game.physics.iter() {
+            for obj in game.physics.objects() {
                 if let Err(payload) = panic::catch_unwind(|| game.map.visibility_for(obj.center)) {
                     panics.push((time, obj.center, panic_message(payload)));
                 }

@@ -340,7 +340,7 @@ fn disc_collisions_conserve_momentum() {
 
     for discs in [head_on(1.0, 1.0), head_on(2.0, 1.0), oblique] {
         let before = momentum(&discs);
-        let after = momentum(bounced(discs).iter());
+        let after = momentum(bounced(discs).objects());
         assert!(before.distance(after) < 1e-6, "{before} -> {after}");
     }
 }
@@ -351,7 +351,7 @@ fn equal_disc_collision_conserves_energy() {
     let before = energy(&discs);
 
     let physics = bounced(discs);
-    let after = energy(physics.iter());
+    let after = energy(physics.objects());
 
     assert_eq!(before, after);
     assert_eq!(physics.objects[0].velocity_linear, Vec2::ZERO);
@@ -365,7 +365,7 @@ fn unequal_disc_collision_conserves_energy() {
         .map(|(m1, m2)| {
             let discs = head_on(m1, m2);
             let before = energy(&discs);
-            let after = energy(bounced(discs).iter());
+            let after = energy(bounced(discs).objects());
             println!("Masses {m1} and {m2}: energy {before} -> {after}");
             after / before
         })
@@ -385,9 +385,9 @@ fn simultaneous_disc_collisions_conserve_energy() {
     let before = energy(&discs);
 
     let physics = bounced(discs);
-    let after = energy(physics.iter());
+    let after = energy(physics.objects());
 
-    for d in physics.iter() {
+    for d in physics.objects() {
         println!("{} at {}", d.velocity_linear, d.center);
     }
 
@@ -411,7 +411,7 @@ fn disc_collisions_are_pair_order_independent() {
     for order in [[0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
         let physics = bounced(order.map(|i| discs[i].clone().with_meta(i)));
 
-        for d in physics.iter() {
+        for d in physics.objects() {
             let expected = reference.objects[d.meta].velocity_linear;
             assert!(d.velocity_linear.distance(expected) < 1e-6, "{order:?}");
         }

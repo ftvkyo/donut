@@ -63,8 +63,8 @@ impl<M> Physics<M> {
         self.objects.push(obj);
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = &PhysObject<M>> {
-        self.objects.iter()
+    pub fn objects(&self) -> &[PhysObject<M>] {
+        &self.objects
     }
 
     fn for_each_mut(&mut self, mut f: impl FnMut(&mut PhysObject<M>)) {
