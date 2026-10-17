@@ -230,7 +230,6 @@ fn sliding_vertical_speed(floor: &[SceneObject], speed: f32) -> f32 {
 }
 
 #[test]
-#[ignore = "endpoints between adjacent tile segments kick a sliding disc"]
 fn sliding_across_tile_edges_is_smooth() {
     let single = [segment((-2.5, 0.5), (2.5, 0.5))];
 
