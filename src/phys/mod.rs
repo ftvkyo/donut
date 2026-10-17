@@ -6,7 +6,7 @@ use crate::{
     geo::ToricGeometry,
     phys::{
         collision::CollideWith,
-        object::{PhysObject, SceneObject},
+        object::{PhysObject, PhysObjectShape, SceneObject},
     },
 };
 
@@ -36,7 +36,15 @@ impl<M> Physics<M> {
         let mut seconds = time.as_secs_f32();
 
         while seconds > 0.0 {
-            let timestep = self.max_timestep.min(seconds);
+            // Objects move about half their radius per step at most, so that they cannot pass
+            // through segments
+            let timestep = self
+                .objects
+                .iter()
+                .fold(self.max_timestep.min(seconds), |step, obj| {
+                    let PhysObjectShape::Disc { radius } = obj.shape;
+                    step.min(radius / 2.0 / obj.velocity_linear.length())
+                });
 
             self.for_each_distinct_pair_mut(|obj1, obj2| {
                 obj1.collide(obj2);

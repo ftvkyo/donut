@@ -156,7 +156,6 @@ fn slow_disc_does_not_tunnel() {
 }
 
 #[test]
-#[ignore = "a disc moving more than its radius per step tunnels through segments and walls"]
 fn fast_disc_does_not_tunnel() {
     let speeds = || (1..=200).map(|s| s as f32 * 0.25);
 
