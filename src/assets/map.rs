@@ -78,8 +78,8 @@ impl Map {
         let map_w = self.inner.width;
         let map_h = self.inner.height;
         // Shift all tiles to make (0.0, 0.0) be the map center
-        // TODO: figure out what's going on with the magic numbers
-        let map_offset = vec2(map_w as f32 - 1.0, map_h as f32 + 1.0) / -2.0;
+        // Quads are positioned by their centers
+        let map_offset = vec2(map_w as f32, map_h as f32) / -2.0 + 0.5;
 
         let layer_w = layer.width();
         let layer_h = layer.height();
@@ -98,7 +98,7 @@ impl Map {
                     let tileset_y = (tile_id / tileset.columns) * tileset.tile_height;
 
                     let pos_x = layer_x as f32;
-                    let pos_y = (layer_h - layer_y) as f32;
+                    let pos_y = (layer_h - 1 - layer_y) as f32;
 
                     let pos = vec3(pos_x, pos_y, z) + map_offset.extend(0.0);
                     let dim = vec2(1.0, 1.0);
