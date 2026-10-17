@@ -3,17 +3,17 @@
 //! Long-running variant, with any number of cases:
 //! `PROPTEST_CASES=100000 cargo test --release --lib geo::fuzz_segment::long -- --ignored`
 
-use std::{cmp::Ordering, collections::BTreeSet, f32::consts::PI, ops::Range};
+use std::{cell::Cell, cmp::Ordering, collections::BTreeSet, f32::consts::PI, ops::Range};
 
 use glam::{DVec2, Vec2};
 use proptest::{collection::vec, prelude::*, sample::select, test_runner::RngSeed};
 
-use crate::testing::{TileGrid, distance_to_segment, dvec, ray_cast, tile_grid};
+use crate::testing::{TileGrid, distance_to_segment, ray_cast, tile_grid};
 
 use super::{
     compute_visibility,
     point::Point,
-    segment::{Segment, SegmentByDistance, SegmentSide},
+    segment::{Segment, SegmentByDistance, SegmentSide, SweepRay},
 };
 
 /// Crossings closer than this along a ray are considered a tie.
@@ -22,8 +22,25 @@ const MARGIN: f64 = 1e-3;
 /// Minimum distance between random segments in general position.
 const GAP: f64 = 1e-3;
 
-fn cmp(q: &Point, s1: &Segment, s2: &Segment) -> Ordering {
-    SegmentByDistance::new(q, s1).cmp(&SegmentByDistance::new(q, s2))
+/// The ray from `q` through `through`, breaking ties on `side` of it.
+fn ray(q: Point, through: Point, side: f64) -> Cell<SweepRay> {
+    Cell::new(SweepRay {
+        dir: through.dvec() - q.dvec(),
+        side,
+    })
+}
+
+/// Segments are told apart by their address.
+fn by_distance<'a>(
+    q: &'a Point,
+    ray: &'a Cell<SweepRay>,
+    s: &'a Segment,
+) -> SegmentByDistance<'a, 'a, 'a> {
+    SegmentByDistance::new(q, s, s as *const Segment as usize, ray)
+}
+
+fn cmp(q: &Point, ray: &Cell<SweepRay>, s1: &Segment, s2: &Segment) -> Ordering {
+    by_distance(q, ray, s1).cmp(&by_distance(q, ray, s2))
 }
 
 /// Positive if `p` is to the left of the line from `a` to `b`, negative if to the right.
@@ -34,7 +51,7 @@ fn orientation(a: DVec2, b: DVec2, p: DVec2) -> f64 {
 fn distance(s1: &Segment, s2: &Segment) -> f64 {
     let (a, b) = s1.ab();
     let (c, d) = s2.ab();
-    let [a, b, c, d] = [a, b, c, d].map(dvec);
+    let [a, b, c, d] = [a, b, c, d].map(Point::dvec);
 
     if orientation(a, b, c) * orientation(a, b, d) < 0.0
         && orientation(c, d, a) * orientation(c, d, b) < 0.0
@@ -55,7 +72,7 @@ fn distance(s1: &Segment, s2: &Segment) -> f64 {
 /// Segments crossed by the ray from `q` through `through`, with the distances to the crossings.
 /// A segment with an endpoint at `through` is crossed there, even if `ray_cast` misses it to rounding.
 fn crossed(q: Point, through: Point, segments: &[Segment]) -> Vec<(f64, &Segment)> {
-    let dir = dvec(through) - dvec(q);
+    let dir = through.dvec() - q.dvec();
 
     segments
         .iter()
@@ -146,10 +163,14 @@ fn disjoint(ends: &[(Point, Point)], gap: f64) -> Vec<Segment> {
     segments
 }
 
-fn check_antisymmetric(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError> {
+fn check_antisymmetric(
+    q: &Point,
+    ray: &Cell<SweepRay>,
+    crossed: &[(f64, &Segment)],
+) -> Result<(), TestCaseError> {
     for &(_, s1) in crossed {
         for &(_, s2) in crossed {
-            let (o12, o21) = (cmp(q, s1, s2), cmp(q, s2, s1));
+            let (o12, o21) = (cmp(q, ray, s1, s2), cmp(q, ray, s2, s1));
             prop_assert_eq!(o12, o21.reverse(), "Q={}, S1={}, S2={}", q, s1, s2);
         }
     }
@@ -157,22 +178,26 @@ fn check_antisymmetric(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), Tes
     Ok(())
 }
 
-fn check_transitive(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError> {
+fn check_transitive(
+    q: &Point,
+    ray: &Cell<SweepRay>,
+    crossed: &[(f64, &Segment)],
+) -> Result<(), TestCaseError> {
     for &(_, s1) in crossed {
         for &(_, s2) in crossed {
-            let o12 = cmp(q, s1, s2);
+            let o12 = cmp(q, ray, s1, s2);
             if o12 == Ordering::Greater {
                 continue;
             }
 
             for &(_, s3) in crossed {
-                let o23 = cmp(q, s2, s3);
+                let o23 = cmp(q, ray, s2, s3);
                 if o23 == Ordering::Greater {
                     continue;
                 }
 
                 prop_assert_eq!(
-                    cmp(q, s1, s3),
+                    cmp(q, ray, s1, s3),
                     o12.then(o23),
                     "Q={}, S1={}, S2={}, S3={}, S1:S2={:?}, S2:S3={:?}",
                     q,
@@ -189,12 +214,16 @@ fn check_transitive(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCa
     Ok(())
 }
 
-fn check_by_distance(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError> {
+fn check_by_distance(
+    q: &Point,
+    ray: &Cell<SweepRay>,
+    crossed: &[(f64, &Segment)],
+) -> Result<(), TestCaseError> {
     for &(t1, s1) in crossed {
         for &(t2, s2) in crossed {
             if (t1 - t2).abs() > MARGIN {
                 prop_assert_eq!(
-                    cmp(q, s1, s2),
+                    cmp(q, ray, s1, s2),
                     t1.total_cmp(&t2),
                     "Q={}, S1={} at {}, S2={} at {}",
                     q,
@@ -212,29 +241,33 @@ fn check_by_distance(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestC
 
 /// A `BTreeSet` of segments crossed at distinct distances, like `segments_active` in the visibility sweep,
 /// keeps all of them in order of distance, and `remove` removes the given one.
-fn check_set(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError> {
-    let mut by_distance = crossed.to_vec();
-    by_distance.sort_by(|(t1, _), (t2, _)| t1.total_cmp(t2));
-    by_distance.dedup_by(|(t, _), (t_kept, _)| *t - *t_kept <= MARGIN);
+fn check_set(
+    q: &Point,
+    ray: &Cell<SweepRay>,
+    crossed: &[(f64, &Segment)],
+) -> Result<(), TestCaseError> {
+    let mut sorted = crossed.to_vec();
+    sorted.sort_by(|(t1, _), (t2, _)| t1.total_cmp(t2));
+    sorted.dedup_by(|(t, _), (t_kept, _)| *t - *t_kept <= MARGIN);
 
     let kept: Vec<&Segment> = crossed
         .iter()
         .map(|&(_, s)| s)
-        .filter(|&s| by_distance.iter().any(|&(_, k)| std::ptr::eq(k, s)))
+        .filter(|&s| sorted.iter().any(|&(_, k)| std::ptr::eq(k, s)))
         .collect();
 
     let mut set = BTreeSet::new();
     for &s in &kept {
-        set.insert(SegmentByDistance::new(q, s));
+        set.insert(by_distance(q, ray, s));
     }
 
     let ordered: Vec<String> = set.iter().map(|s| s.segment.to_string()).collect();
-    let expected: Vec<String> = by_distance.iter().map(|(_, s)| s.to_string()).collect();
+    let expected: Vec<String> = sorted.iter().map(|(_, s)| s.to_string()).collect();
     prop_assert_eq!(ordered, expected, "Q={}", q);
 
     for &s in &kept {
         prop_assert!(
-            set.remove(&SegmentByDistance::new(q, s)),
+            set.remove(&by_distance(q, ray, s)),
             "Q={}, S={} not removed",
             q,
             s
@@ -250,11 +283,15 @@ fn check_set(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError
     Ok(())
 }
 
-fn check_all(q: &Point, crossed: &[(f64, &Segment)]) -> Result<(), TestCaseError> {
-    check_antisymmetric(q, crossed)?;
-    check_transitive(q, crossed)?;
-    check_by_distance(q, crossed)?;
-    check_set(q, crossed)
+fn check_all(
+    q: &Point,
+    ray: &Cell<SweepRay>,
+    crossed: &[(f64, &Segment)],
+) -> Result<(), TestCaseError> {
+    check_antisymmetric(q, ray, crossed)?;
+    check_transitive(q, ray, crossed)?;
+    check_by_distance(q, ray, crossed)?;
+    check_set(q, ray, crossed)
 }
 
 /// `intersect_with_ray` finds the crossings for the unnormalised directions the visibility sweep passes.
@@ -263,19 +300,19 @@ fn check_intersect_with_ray(
     through: Point,
     crossed: &[(f64, &Segment)],
 ) -> Result<(), TestCaseError> {
-    let unit = (dvec(through) - dvec(q)).normalize();
+    let unit = (through.dvec() - q.dvec()).normalize();
 
     for &(t, s) in crossed {
         // A segment along the ray has no single crossing
         let (a, b) = s.ab();
-        if [a, b].map(|p| orientation(dvec(q), dvec(through), dvec(p))) == [0.0, 0.0] {
+        if [a, b].map(|p| orientation(q.dvec(), through.dvec(), p.dvec())) == [0.0, 0.0] {
             continue;
         }
 
-        let expected = dvec(q) + unit * t;
+        let expected = q.dvec() + unit * t;
         let point = s.intersect_with_ray(q, q.dir(through));
         prop_assert!(
-            point.is_some_and(|p| dvec(p).distance(expected) < MARGIN),
+            point.is_some_and(|p| p.dvec().distance(expected) < MARGIN),
             "Q={}, through={}, S={}: got {:?}, expected {}",
             q,
             through,
@@ -302,33 +339,30 @@ proptest! {
     #![proptest_config(config(256, RngSeed::Fixed(0)))]
 
     #[test]
-    #[ignore = "convex tile corners compare Greater both ways"]
     fn tile_map_antisymmetric((grid, q, through) in tile_scene(12)) {
         let segments = grid.segments();
-        check_antisymmetric(&q, &crossed(q, through, &segments))?;
+        check_antisymmetric(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
-    #[ignore = "edges meeting on the ray compare inconsistently"]
     fn tile_map_transitive((grid, q, through) in tile_scene(12)) {
         let segments = grid.segments();
-        check_transitive(&q, &crossed(q, through, &segments))?;
+        check_transitive(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
     fn tile_map_by_distance((grid, q, through) in tile_scene(12)) {
         let segments = grid.segments();
-        check_by_distance(&q, &crossed(q, through, &segments))?;
+        check_by_distance(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
     fn tile_map_set((grid, q, through) in tile_scene(12)) {
         let segments = grid.segments();
-        check_set(&q, &crossed(q, through, &segments))?;
+        check_set(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
-    #[ignore = "panics: 'Tried to compare segments that intersect'"]
     fn tile_map_origin_near_corner(
         (grid, q, through) in tile_scene(12),
         dx in prop_oneof![-2e-4f32..-1e-5, 1e-5f32..2e-4],
@@ -342,7 +376,7 @@ proptest! {
 
         for &(_, s1) in &crossed {
             for &(_, s2) in &crossed {
-                cmp(&q, s1, s2);
+                cmp(&q, &ray(q, through, 1.0), s1, s2);
             }
         }
     }
@@ -350,25 +384,25 @@ proptest! {
     #[test]
     fn general_antisymmetric((ends, q, through) in general_scene(0.1..40.0)) {
         let segments = disjoint(&ends, GAP);
-        check_antisymmetric(&q, &crossed(q, through, &segments))?;
+        check_antisymmetric(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
     fn general_transitive((ends, q, through) in general_scene(0.1..40.0)) {
         let segments = disjoint(&ends, GAP);
-        check_transitive(&q, &crossed(q, through, &segments))?;
+        check_transitive(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
     fn general_by_distance((ends, q, through) in general_scene(0.1..40.0)) {
         let segments = disjoint(&ends, GAP);
-        check_by_distance(&q, &crossed(q, through, &segments))?;
+        check_by_distance(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     #[test]
     fn general_set((ends, q, through) in general_scene(0.1..40.0)) {
         let segments = disjoint(&ends, GAP);
-        check_set(&q, &crossed(q, through, &segments))?;
+        check_set(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 }
 
@@ -378,7 +412,7 @@ proptest! {
     #[test]
     fn short_segments((ends, q, through) in general_scene(0.01..0.1)) {
         let segments = disjoint(&ends, GAP);
-        check_all(&q, &crossed(q, through, &segments))?;
+        check_all(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 
     /// Fails in about 7 of 100000 cases.
@@ -394,41 +428,54 @@ proptest! {
     fn long_tile_maps((grid, q, through) in tile_scene(32)) {
         let segments = grid.segments();
         let crossed = crossed(q, through, &segments);
-        check_by_distance(&q, &crossed)?;
-        check_set(&q, &crossed)?;
+        check_by_distance(&q, &ray(q, through, 1.0), &crossed)?;
+        check_set(&q, &ray(q, through, 1.0), &crossed)?;
     }
 
     #[test]
     #[ignore = "long-running"]
     fn long_general_segments((ends, q, through) in general_scene(0.1..40.0)) {
         let segments = disjoint(&ends, GAP);
-        check_all(&q, &crossed(q, through, &segments))?;
+        check_all(&q, &ray(q, through, 1.0), &crossed(q, through, &segments))?;
     }
 }
 
 #[test]
-#[ignore = "cmp is Greater both ways"]
-fn convex_corner_antisymmetric() {
-    // Bottom and right edges of a tile, seen across its corner
+fn convex_corner_ordered_by_side() {
+    // Bottom and right edges of a tile, seen across its corner:
+    // just counter-clockwise of the corner the ray crosses the bottom, just clockwise the right
     let bottom = seg((0.0, 0.0), (1.0, 0.0));
     let right = seg((1.0, 0.0), (1.0, 1.0));
     let q = Point::new(2.0, -1.0);
+    let corner = Point::new(1.0, 0.0);
 
-    assert_eq!(cmp(&q, &bottom, &right), cmp(&q, &right, &bottom).reverse());
+    let ccw = ray(q, corner, 1.0);
+    assert_eq!(cmp(&q, &ccw, &bottom, &right), Ordering::Less);
+    assert_eq!(cmp(&q, &ccw, &right, &bottom), Ordering::Greater);
+
+    let cw = ray(q, corner, -1.0);
+    assert_eq!(cmp(&q, &cw, &bottom, &right), Ordering::Greater);
+    assert_eq!(cmp(&q, &cw, &right, &bottom), Ordering::Less);
 }
 
 #[test]
-#[ignore = "panics: 'Tried to compare segments that intersect'"]
 fn origin_near_corner() {
     let bottom = seg((-0.5, -0.5), (0.5, -0.5));
     let right = seg((0.5, -0.5), (0.5, 0.5));
-    let q = Point::new(0.49995, -0.50005);
+    let q = Point::new(0.50005, -0.50005);
+    let corner = Point::new(0.5, -0.5);
 
-    cmp(&q, &bottom, &right);
+    assert_eq!(
+        cmp(&q, &ray(q, corner, 1.0), &bottom, &right),
+        Ordering::Less
+    );
+    assert_eq!(
+        cmp(&q, &ray(q, corner, -1.0), &bottom, &right),
+        Ordering::Greater
+    );
 }
 
 #[test]
-#[ignore = "panics: 'Tried to compare segments that intersect'"]
 fn visibility_origin_near_corner() {
     let grid = TileGrid {
         width: 3,
@@ -436,26 +483,29 @@ fn visibility_origin_near_corner() {
         solid: vec![false, false, false, false, true, false, false, false, false],
     };
 
-    compute_visibility(Point::new(0.49995, -0.50005), &grid.segments());
+    compute_visibility(Point::new(0.50005, -0.50005), &grid.segments());
 }
 
 #[test]
 fn short_parallel_segments_ordered() {
     let near = seg((1.0, -0.005), (1.0, 0.005));
     let far = seg((1.008, -0.005), (1.008, 0.005));
+    let q = Point::ZERO;
 
-    assert_eq!(cmp(&Point::ZERO, &near, &far), Ordering::Less);
+    assert_eq!(
+        cmp(&q, &ray(q, Point::new(1.0, 0.0), 1.0), &near, &far),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn short_parallel_segments_in_set() {
     let near = seg((1.0, -0.005), (1.0, 0.005));
     let far = seg((1.008, -0.005), (1.008, 0.005));
+    let q = Point::ZERO;
+    let ray = ray(q, Point::new(1.0, 0.0), 1.0);
 
-    let set = BTreeSet::from([
-        SegmentByDistance::new(&Point::ZERO, &near),
-        SegmentByDistance::new(&Point::ZERO, &far),
-    ]);
+    let set = BTreeSet::from([by_distance(&q, &ray, &near), by_distance(&q, &ray, &far)]);
 
     assert_eq!(set.len(), 2);
 }
@@ -464,19 +514,23 @@ fn short_parallel_segments_in_set() {
 fn short_parallel_segments_removed_from_set() {
     let near = seg((1.0, -0.005), (1.0, 0.005));
     let far = seg((1.008, -0.005), (1.008, 0.005));
+    let q = Point::ZERO;
+    let ray = ray(q, Point::new(1.0, 0.0), 1.0);
 
-    let mut set = BTreeSet::from([SegmentByDistance::new(&Point::ZERO, &near)]);
+    let mut set = BTreeSet::from([by_distance(&q, &ray, &near)]);
 
-    assert!(!set.remove(&SegmentByDistance::new(&Point::ZERO, &far)));
+    assert!(!set.remove(&by_distance(&q, &ray, &far)));
 }
 
 #[test]
 fn short_segment_antisymmetric() {
     let short = seg((1.0, -0.005), (1.0, 0.005));
     let long = seg((1.005, -0.5), (1.005, 0.5));
+    let q = Point::ZERO;
+    let ray = ray(q, Point::new(1.0, 0.0), 1.0);
 
-    assert_eq!(cmp(&Point::ZERO, &short, &long), Ordering::Less);
-    assert_eq!(cmp(&Point::ZERO, &long, &short), Ordering::Greater);
+    assert_eq!(cmp(&q, &ray, &short, &long), Ordering::Less);
+    assert_eq!(cmp(&q, &ray, &long, &short), Ordering::Greater);
 }
 
 #[test]
@@ -486,20 +540,21 @@ fn short_segments_near_t() {
     let s2 = seg((0.0, -0.005), (0.0, 0.005));
     let q = Point::new(-1.0, -0.404);
 
-    assert_eq!(cmp(&q, &s1, &s2), Ordering::Greater);
+    let ray = ray(q, Point::new(0.01, 0.0), 1.0);
+    assert_eq!(cmp(&q, &ray, &s1, &s2), Ordering::Greater);
 }
 
 #[test]
-#[ignore = "cmp depends on the direction of S2"]
 fn t_junction_ordered() {
     // S1 ends on the middle of S2, and the ray through (0, 1.5) crosses S1 first
     let s1 = seg((0.0, 1.0), (0.0, 2.0));
     let s2 = seg((-1.0, 2.0), (1.0, 2.0));
     let s2_reversed = seg((1.0, 2.0), (-1.0, 2.0));
     let q = Point::new(0.5, 0.0);
+    let ray = ray(q, Point::new(0.0, 1.5), 1.0);
 
-    assert_eq!(cmp(&q, &s1, &s2), Ordering::Less);
-    assert_eq!(cmp(&q, &s1, &s2_reversed), Ordering::Less);
+    assert_eq!(cmp(&q, &ray, &s1, &s2), Ordering::Less);
+    assert_eq!(cmp(&q, &ray, &s1, &s2_reversed), Ordering::Less);
 }
 
 #[test]
@@ -509,12 +564,14 @@ fn s1_straddling_line_of_s2() {
     // S2 is between Q and S1
     let s1 = seg((2.0, -1.0), (2.0, 3.0));
     let s2 = seg((0.5, 1.0), (1.5, 1.0));
-    assert_eq!(cmp(&q, &s1, &s2), Ordering::Greater);
+    let through_s2 = ray(q, Point::new(1.0, 1.0), 1.0);
+    assert_eq!(cmp(&q, &through_s2, &s1, &s2), Ordering::Greater);
 
     // S2 is behind S1
     let s1 = seg((1.0, -1.0), (1.0, 3.0));
     let s2 = seg((1.5, 2.0), (2.5, 2.0));
-    assert_eq!(cmp(&q, &s1, &s2), Ordering::Less);
+    let through_s2 = ray(q, Point::new(2.0, 2.0), 1.0);
+    assert_eq!(cmp(&q, &through_s2, &s1, &s2), Ordering::Less);
 }
 
 /// Nearly parallel segments with S2 entirely behind S1, where rounding puts `S2.a` on the side of Q.
@@ -536,7 +593,7 @@ fn s1_straddling_line_of_s2_rounding() {
     assert!(distance(s1, s2) > 0.0);
     assert!(crossed.len() == 2 && crossed[0].0 + MARGIN < crossed[1].0);
 
-    assert_eq!(cmp(&q, s1, s2), Ordering::Less);
+    assert_eq!(cmp(&q, &ray(q, through, 1.0), s1, s2), Ordering::Less);
 }
 
 #[test]
@@ -545,8 +602,8 @@ fn which_side_rounding() {
     let (a, b) = s1.ab();
     let s2a = s2.ab().0;
 
-    let orientation_q = orientation(dvec(a), dvec(b), dvec(q));
-    let orientation_s2a = orientation(dvec(a), dvec(b), dvec(s2a));
+    let orientation_q = orientation(a.dvec(), b.dvec(), q.dvec());
+    let orientation_s2a = orientation(a.dvec(), b.dvec(), s2a.dvec());
     assert!(orientation_q * orientation_s2a < 0.0);
 
     assert_ne!(s1.which_side(s2a), s1.which_side(q));
@@ -586,17 +643,9 @@ fn intersect_with_ray_direction_length() {
 }
 
 #[test]
-#[ignore = "intersects lines, if the hit should lie on the segment and the ray"]
 fn intersect_with_ray_outside_segment() {
     let segment = seg((1.0, 1.0), (1.0, 2.0));
 
-    assert_eq!(segment.intersect_with_ray(Point::ZERO, Vec2::X), None);
-}
-
-#[test]
-#[ignore = "intersects lines, if the hit should lie on the segment and the ray"]
-fn intersect_with_ray_behind_origin() {
-    let segment = seg((1.0, -1.0), (1.0, 1.0));
-
-    assert_eq!(segment.intersect_with_ray(Point::ZERO, Vec2::NEG_X), None);
+    let hit = segment.intersect_with_ray(Point::ZERO, Vec2::X);
+    assert_eq!(hit, Some(Point::new(1.0, 1.0)));
 }

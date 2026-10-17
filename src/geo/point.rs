@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::{DVec2, Vec2};
 
 use std::fmt::{Debug, Display};
 
@@ -20,6 +20,10 @@ impl Point {
             x: self.x,
             y: self.y,
         }
+    }
+
+    pub fn dvec(self) -> DVec2 {
+        DVec2::new(self.x as f64, self.y as f64)
     }
 
     pub fn midpoint(self, other: Self) -> Self {

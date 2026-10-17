@@ -1,6 +1,9 @@
-use std::fmt::{Debug, Display};
+use std::{
+    cell::Cell,
+    fmt::{Debug, Display},
+};
 
-use glam::Vec2;
+use glam::{DVec2, Vec2};
 use log::trace;
 
 use crate::geo::ImpreciseEq;
@@ -56,7 +59,8 @@ impl Segment {
         point.dist(self.a + ab * t)
     }
 
-    /// Intersects the line defined by the segment with the line defined by the ray.
+    /// Where the line defined by the ray crosses the line defined by the segment,
+    /// moved onto the segment if it misses it.
     pub fn intersect_with_ray(&self, origin: Point, direction: Vec2) -> Option<Point> {
         let ab = self.a.dir(self.b);
         let denominator = direction.perp_dot(ab);
@@ -69,9 +73,9 @@ impl Segment {
             return None;
         }
 
-        let t = origin.dir(self.a).perp_dot(ab) / denominator;
+        let u = origin.dir(self.a).perp_dot(direction) / denominator;
 
-        return Some(origin + direction * t);
+        return Some(self.a + ab * u.clamp(0.0, 1.0));
     }
 
     pub fn which_side(&self, point: Point) -> Option<SegmentSide> {
@@ -117,364 +121,200 @@ impl Display for Segment {
     }
 }
 
-/// Note: segments must not intersect except at their endpoints.
-/// Note: it should be possible to draw a straight line from `origin` through both segments that are being compared.
-pub struct SegmentByDistance<'o, 's> {
-    pub origin: &'o Point,
-    pub segment: &'s Segment,
+/// A ray from the origin of a sweep, and the side of it on which ties are broken.
+#[derive(Clone, Copy, Debug)]
+pub struct SweepRay {
+    pub dir: DVec2,
+    /// 1.0 to break ties just counter-clockwise of the ray, -1.0 just clockwise of it
+    pub side: f64,
 }
 
-impl<'o, 's> SegmentByDistance<'o, 's> {
-    pub fn new(origin: &'o Point, segment: &'s Segment) -> Self {
-        Self { origin, segment }
+impl SweepRay {
+    /// Angle between the ray and the rays on its sides
+    const TIE_ANGLE: f64 = 1e-6;
+
+    /// Distances closer than this, relative to them, are a tie
+    const TIE_DISTANCE: f64 = 1e-9;
+}
+
+/// Orders segments by the distance from `origin` along the current `ray` to them.
+/// Segments that tie, such as those meeting where the ray passes, are ordered by the distance
+/// along a ray just to the side of it, and then by `index`.
+/// Note: segments must not intersect except at their endpoints, and must all cross the ray.
+pub struct SegmentByDistance<'o, 's, 'r> {
+    pub origin: &'o Point,
+    pub segment: &'s Segment,
+    pub index: usize,
+    pub ray: &'r Cell<SweepRay>,
+}
+
+impl<'o, 's, 'r> SegmentByDistance<'o, 's, 'r> {
+    pub fn new(
+        origin: &'o Point,
+        segment: &'s Segment,
+        index: usize,
+        ray: &'r Cell<SweepRay>,
+    ) -> Self {
+        Self {
+            origin,
+            segment,
+            index,
+            ray,
+        }
+    }
+
+    /// Distance from the origin along `dir` to the line defined by the segment, in units of `dir`,
+    /// or infinity if `on_segment` and the ray misses the segment itself.
+    fn distance_along(&self, dir: DVec2, on_segment: bool) -> f64 {
+        let q = self.origin.dvec();
+        let (a, b) = (self.segment.a.dvec(), self.segment.b.dvec());
+        let ab = b - a;
+
+        let denominator = dir.perp_dot(ab);
+        let t = (a - q).perp_dot(ab) / denominator;
+        let u = (a - q).perp_dot(dir) / denominator;
+
+        if on_segment && (t < 0.0 || !(0.0..=1.0).contains(&u)) {
+            return f64::INFINITY;
+        }
+
+        t
+    }
+
+    fn cmp_along(&self, other: &Self, dir: DVec2, on_segment: bool) -> std::cmp::Ordering {
+        let t1 = self.distance_along(dir, on_segment);
+        let t2 = other.distance_along(dir, on_segment);
+
+        let tolerance = SweepRay::TIE_DISTANCE * t1.abs().max(t2.abs());
+        if t1 == t2 || (tolerance.is_finite() && (t1 - t2).abs() <= tolerance) {
+            return std::cmp::Ordering::Equal;
+        }
+
+        t1.partial_cmp(&t2).unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
-impl PartialOrd for SegmentByDistance<'_, '_> {
+impl PartialOrd for SegmentByDistance<'_, '_, '_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for SegmentByDistance<'_, '_> {
+impl Ord for SegmentByDistance<'_, '_, '_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering as O;
-
-        if !std::ptr::eq(self.origin, other.origin) {
-            panic!("Tried to compare segments by distance to different origins");
+        if !std::ptr::eq(self.origin, other.origin) || !std::ptr::eq(self.ray, other.ray) {
+            panic!(
+                "Tried to compare segments by distance from different origins or along different rays"
+            );
         }
-
-        let q = *self.origin;
-        let s1 = self.segment;
-        let s2 = other.segment;
-
-        trace!("Comparing S1={s1} & S2={s2} with Q={q}");
 
         if std::ptr::eq(self.segment, other.segment) {
-            trace!(" -> S1 and S2 are the same segment");
-            return O::Equal;
+            return std::cmp::Ordering::Equal;
         }
 
-        let s2a_to_s1 = s1.which_side(s2.a);
-        let s2b_to_s1 = s1.which_side(s2.b);
+        let ray = self.ray.get();
+        let dir_aside = ray.dir + ray.dir.perp() * ray.side * SweepRay::TIE_ANGLE;
 
-        let s1a_to_s2 = s2.which_side(s1.a);
-        let s1b_to_s2 = s2.which_side(s1.b);
+        let order = self
+            .cmp_along(other, ray.dir, false)
+            .then_with(|| self.cmp_along(other, dir_aside, true))
+            .then(self.index.cmp(&other.index));
 
-        // The core assumption for the comparison logic is that it should be possible to draw
-        // a line that goes through q and intersects both of the segments.
+        trace!(
+            "Compared S1={} & S2={} along {:?}: {order:?}",
+            self.segment, other.segment, ray
+        );
 
-        match (s1.which_side(q), s2.which_side(q)) {
-            (None, None) => {
-                // `q` IS on the line defined by `s1`.
-                // `q` IS on the line defined by `s2`.
-                // Therefore the closest segment is the one that contains the closest point.
-                trace!(" -> Q is on the lines S1 & S2");
-                let dist2_s1 = q.dist_sq(s1.a).min(q.dist_sq(s1.b));
-                let dist2_s2 = q.dist_sq(s2.a).min(q.dist_sq(s2.b));
-                if dist2_s1 < dist2_s2 {
-                    return O::Less;
-                } else if dist2_s1 > dist2_s2 {
-                    return O::Greater;
-                } else {
-                    panic!("Tried to compare segments that intersect: S1={s1}, S2={s2}");
-                }
-            }
-            (Some(q_to_s1), None) => {
-                // `q` IS NOT on the line defined by `s1`.
-                // `q` IS on the line defined by `s2`.
-                // `s2.a` & `s2.b` would be on the same side of `s1`.
-                trace!(" -> Q is on the line S2");
-                match (s2a_to_s1, s2b_to_s1) {
-                    (Some(s2_to_s1), _) | (_, Some(s2_to_s1)) => {
-                        if s2_to_s1 == q_to_s1 {
-                            return O::Greater;
-                        } else {
-                            return O::Less;
-                        }
-                    }
-                    _ => {
-                        // If `q` is not on the line defined by `s1`,
-                        // `q` is on the line defined by `s2`,
-                        // and `s2` is on neither side of `s1`,
-                        // both points of `s2` must lay on `s1` and therefore its length is zero.
-                        unreachable!(
-                            "Got S2 with length zero? Was comparing S1={s1} & S2={s2} with Q={q}"
-                        );
-                    }
-                }
-            }
-            (None, Some(q_to_s2)) => {
-                // `q` IS on the line defined by `s1`.
-                // `q` IS NOT on the line defined by `s2`.
-                // `s1.a` & `s1.b` would be on the same side of `s2`.
-                trace!(" -> Q is on the line S1");
-                match (s1a_to_s2, s1b_to_s2) {
-                    (Some(s1_to_s2), _) | (_, Some(s1_to_s2)) => {
-                        if s1_to_s2 == q_to_s2 {
-                            return O::Less;
-                        } else {
-                            return O::Greater;
-                        }
-                    }
-                    _ => {
-                        // If `q` is on the line defined by `s1`,
-                        // `q` is not on the line defined by `s2`,
-                        // and `s1` is on neither side of `s2`,
-                        // both points of `s1` must lay on `s2` and therefore its length is zero.
-                        unreachable!(
-                            "Got S1 of length zero? Was comparing S1={s1} & S2={s2} with Q={q}"
-                        );
-                    }
-                }
-            }
-            (Some(q_to_s1), Some(q_to_s2)) => {
-                trace!(" -> Q is on the {q_to_s1} of S1");
-                trace!(" -> Q is on the {q_to_s2} of S2");
-                match (s1a_to_s2, s1b_to_s2) {
-                    (Some(s1a_to_s2), Some(s1b_to_s2)) => {
-                        trace!(" -> S1a is on the {s1a_to_s2} of S2");
-                        trace!(" -> S1b is on the {s1b_to_s2} of S2");
-
-                        if q_to_s2 == s1a_to_s2 && q_to_s2 == s1b_to_s2 {
-                            return O::Less;
-                        }
-
-                        if s1a_to_s2 == s1b_to_s2 {
-                            return O::Greater;
-                        }
-
-                        match (s2a_to_s1, s2b_to_s1) {
-                            (Some(s2a_to_s1), Some(s2b_to_s1)) => {
-                                trace!(" -> S2a is on the {s2a_to_s1} of S1");
-                                trace!(" -> S2b is on the {s2b_to_s1} of S1");
-
-                                if q_to_s1 == s2a_to_s1 && q_to_s1 == s2b_to_s1 {
-                                    return O::Greater;
-                                }
-
-                                return O::Less;
-                            }
-                            (Some(s2_to_s1), _) | (_, Some(s2_to_s1)) => {
-                                trace!(" -> one of the points of S2 is on the line defined by S1"); // (but not the other)
-                                if s2_to_s1 == q_to_s1 {
-                                    return O::Greater;
-                                } else {
-                                    return O::Less;
-                                }
-                            }
-                            _ => unreachable!(
-                                "S2 can't be on the same line as S1, as S1 is already not on the same line as S2"
-                            ),
-                        }
-                    }
-                    (Some(s1_to_s2), _) | (_, Some(s1_to_s2)) => {
-                        trace!(" -> one of the points of S1 is on the line defined by S2"); // (but not the other)
-
-                        match (s2a_to_s1, s2b_to_s1) {
-                            (Some(s2a_to_s1), Some(_)) => {
-                                trace!(" -> no point of S2 is on the line defined by S1");
-                                if s2a_to_s1 == q_to_s1 {
-                                    trace!(" -> S2 & Q are on the same side of S1");
-                                    return O::Greater;
-                                } else {
-                                    trace!(" -> S2 & Q are on different sides of S1");
-                                    return O::Less;
-                                }
-                            }
-                            (Some(s2_to_s1), _) | (_, Some(s2_to_s1)) => {
-                                trace!(" -> one of the points of S2 is on the line defined by S1"); // (but not the other)
-                                trace!(" -> ends of S1 & S2 are touching");
-
-                                if s1_to_s2 == q_to_s2 {
-                                    if s2_to_s1 == q_to_s1 {
-                                        trace!(
-                                            " -> S1 & S2 form a '> Q' or a '< Q' shape and are therefore equal"
-                                        );
-                                    } else {
-                                        trace!(
-                                            " -> S1 & S2 form a '<' or '>' shape and S1 is closer"
-                                        );
-                                        return O::Less;
-                                    }
-                                } else {
-                                    trace!(" -> S1 & S2 form a '<' or '>' shape and S2 is closer");
-                                    return O::Greater;
-                                }
-
-                                return O::Equal;
-                            }
-                            _ => {
-                                unreachable!(
-                                    "S2 can't be on the same line as S1, as S1 is already is not on the same line as S2"
-                                )
-                            }
-                        }
-                    }
-                    _ => {
-                        trace!(" -> S1 & S2 are on the same line and their ends are touching");
-                        return O::Equal;
-                    }
-                }
-            }
-        }
+        order
     }
 }
 
-impl PartialEq for SegmentByDistance<'_, '_> {
+impl PartialEq for SegmentByDistance<'_, '_, '_> {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == std::cmp::Ordering::Equal
     }
 }
 
-impl Eq for SegmentByDistance<'_, '_> {}
+impl Eq for SegmentByDistance<'_, '_, '_> {}
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::Ordering;
+
     use crate::init_logging;
 
     use super::*;
 
-    const O: Point = Point::new(0.0, 0.0);
+    /// Compares `s1` and `s2` along the ray from `q` through `through`.
+    fn cmp(q: Point, through: (f32, f32), side: f64, s1: &Segment, s2: &Segment) -> Ordering {
+        init_logging();
 
-    macro_rules! seg {
-        ($x1:expr, $y1:expr, $x2:expr, $y2:expr) => {
-            SegmentByDistance {
-                origin: &O,
-                segment: Box::leak(Box::new(Segment {
-                    a: Point::new($x1 as f32, $y1 as f32),
-                    b: Point::new($x2 as f32, $y2 as f32),
-                })),
-            }
-        };
+        let dir = Point::from(through).dvec() - q.dvec();
+        let ray = Cell::new(SweepRay { dir, side });
+
+        let order =
+            SegmentByDistance::new(&q, s1, 1, &ray).cmp(&SegmentByDistance::new(&q, s2, 2, &ray));
+        let reverse =
+            SegmentByDistance::new(&q, s2, 2, &ray).cmp(&SegmentByDistance::new(&q, s1, 1, &ray));
+        assert_eq!(order, reverse.reverse(), "S1={s1}, S2={s2}");
+
+        order
+    }
+
+    fn seg(a: (f32, f32), b: (f32, f32)) -> Segment {
+        Segment::new(a, b).unwrap()
     }
 
     #[test]
     fn segment_ord() {
-        init_logging();
+        let q = Point::ZERO;
 
-        let s = [
-            seg!(-2, 2, 0, 2),
-            seg!(0, 2, 2, 2),
-            seg!(-2, 3, 2, 3),
-            seg!(-3, 6, -1, 4),
-            seg!(0, 4, 0, 6),
-            seg!(1, 4, 3, 7),
-            seg!(-2, 6, 0, 8),
-            seg!(0, 8, 2, 6),
-            seg!(0, 9, 0, 11),
-            seg!(2, 4, 4, 6),
-        ];
+        // Parallel, one behind the other
+        let near = seg((-2.0, 2.0), (2.0, 2.0));
+        let far = seg((-2.0, 3.0), (2.0, 3.0));
+        assert_eq!(cmp(q, (0.5, 1.0), 1.0, &near, &far), Ordering::Less);
 
-        let expect_equal = |i1: usize, i2: usize| {
-            assert!(
-                s[i1] == s[i2],
-                "Expected equality:\ns{i1}={}\ns{i2}={}",
-                s[i1].segment,
-                s[i2].segment
-            );
-            assert!(
-                s[i2] == s[i1],
-                "Expected equality:\ns{i2}={}\ns{i1}={}",
-                s[i2].segment,
-                s[i1].segment
-            );
-        };
+        // Slanted, partly overlapping as seen from Q
+        let s1 = seg((1.0, 4.0), (3.0, 7.0));
+        let s2 = seg((0.0, 8.0), (2.0, 6.0));
+        assert_eq!(cmp(q, (1.0, 5.0), 1.0, &s1, &s2), Ordering::Less);
 
-        let expect_less = |i1: usize, i2: usize| {
-            assert!(
-                s[i1] < s[i2],
-                "Expected left < right:\ns{i1}={}\ns{i2}={}",
-                s[i1].segment,
-                s[i2].segment
-            );
-            assert!(
-                s[i2] > s[i1],
-                "Expected left > right:\ns{i2}={}\ns{i1}={}",
-                s[i2].segment,
-                s[i1].segment
-            );
-        };
-
-        for i in 0..s.len() {
-            expect_equal(i, i);
-        }
-
-        expect_equal(0, 1);
-        expect_equal(6, 7);
-
-        expect_less(0, 2);
-        expect_less(0, 3);
-        expect_less(0, 4);
-        expect_less(0, 6);
-        expect_less(0, 7);
-
-        expect_less(1, 2);
-        expect_less(1, 4);
-        expect_less(1, 5);
-        expect_less(1, 6);
-        expect_less(1, 7);
-
-        expect_less(3, 6);
-
-        expect_less(5, 7);
-
-        expect_less(4, 8);
-
-        expect_less(9, 5);
+        let s1 = seg((2.0, 4.0), (4.0, 6.0));
+        assert_eq!(cmp(q, (3.0, 5.0), 1.0, &s1, &s2), Ordering::Less);
     }
 
     #[test]
     fn segment_ord_weird() {
-        init_logging();
+        let s1 = seg((-2.0, 2.0), (-2.0, 0.0));
+        let s2 = seg((-4.0, 0.0), (-5.0, 0.0));
+        let q = Point::new(0.0, 1.0);
 
-        let s1 = Segment {
-            a: Point::new(-2.0, 2.0),
-            b: Point::new(-2.0, 0.0),
-        };
-        let s2 = Segment {
-            a: Point::new(-4.0, 0.0),
-            b: Point::new(-5.0, 0.0),
-        };
-        let origin = Point::new(0.0, 1.0);
-
-        let sd1 = SegmentByDistance {
-            origin: &origin,
-            segment: &s1,
-        };
-        let sd2 = SegmentByDistance {
-            origin: &origin,
-            segment: &s2,
-        };
-
-        assert!(sd1 < sd2, "\norigin={origin}\nsd1={s1}\nsd2={s2}");
-        assert!(sd2 > sd1, "\norigin={origin}\nsd1={s1}\nsd2={s2}");
+        assert_eq!(cmp(q, (-2.0, 0.5), 1.0, &s1, &s2), Ordering::Less);
     }
 
     #[test]
-    fn segment_ord_touching_sideways() {
-        init_logging();
+    fn segments_meeting_on_the_ray() {
+        let q = Point::ZERO;
 
-        let s1 = Segment {
-            a: Point::new(-2.0, 2.0),
-            b: Point::new(-2.0, 0.0),
-        };
-        let s2 = Segment {
-            a: Point::new(-2.0, 2.0),
-            b: Point::new(-3.0, 2.0),
-        };
-        let origin = Point::new(0.0, 1.0);
+        // A '^' shape with its apex on the ray: just counter-clockwise only the left segment is
+        // crossed, and just clockwise only the right one
+        let left = seg((-2.0, 6.0), (0.0, 8.0));
+        let right = seg((0.0, 8.0), (2.0, 6.0));
+        assert_eq!(cmp(q, (0.0, 8.0), 1.0, &left, &right), Ordering::Less);
+        assert_eq!(cmp(q, (0.0, 8.0), -1.0, &left, &right), Ordering::Greater);
 
-        let sd1 = SegmentByDistance {
-            origin: &origin,
-            segment: &s1,
-        };
-        let sd2 = SegmentByDistance {
-            origin: &origin,
-            segment: &s2,
-        };
+        // Touching sideways
+        let s1 = seg((-2.0, 2.0), (-2.0, 0.0));
+        let s2 = seg((-2.0, 2.0), (-3.0, 2.0));
+        let q = Point::new(0.0, 1.0);
+        assert_eq!(cmp(q, (-2.0, 2.0), 1.0, &s1, &s2), Ordering::Less);
+    }
 
-        assert!(sd1 < sd2, "\norigin={origin}\nsd1={s1}\nsd2={s2}");
-        assert!(sd2 > sd1, "\norigin={origin}\nsd1={s1}\nsd2={s2}");
+    #[test]
+    fn collinear_segments_meeting_on_the_ray() {
+        // Both lines pass through the meeting point, so the index decides
+        let s1 = seg((-2.0, 2.0), (0.0, 2.0));
+        let s2 = seg((0.0, 2.0), (2.0, 2.0));
+        assert_eq!(cmp(Point::ZERO, (0.0, 2.0), 1.0, &s1, &s2), Ordering::Less);
     }
 }

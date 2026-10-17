@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     collections::BTreeSet,
     f32::consts::{PI, TAU},
     fmt::Display,
@@ -10,7 +11,7 @@ use crate::geo::ImpreciseEq;
 
 use super::{
     point::Point,
-    segment::{Segment, SegmentByDistance},
+    segment::{Segment, SegmentByDistance, SweepRay},
 };
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -104,10 +105,16 @@ pub fn compute_visibility(origin: Point, segments: &[Segment]) -> Vec<Segment> {
         }
     }
 
-    let mut segments_active = BTreeSet::<SegmentByDistance<'_, '_>>::new();
+    // Segments are ordered along the ray to the current event, so it outlives them
+    let ray = Cell::new(SweepRay {
+        dir: events[0].point.dvec() - origin.dvec(),
+        side: -1.0,
+    });
+
+    let mut segments_active = BTreeSet::<SegmentByDistance<'_, '_, '_>>::new();
 
     for segment_i in segments_active_at_first_event {
-        let segment = SegmentByDistance::new(&origin, &segments[segment_i]);
+        let segment = SegmentByDistance::new(&origin, &segments[segment_i], segment_i, &ray);
         segments_active.insert(segment);
     }
 
@@ -145,8 +152,19 @@ pub fn compute_visibility(origin: Point, segments: &[Segment]) -> Vec<Segment> {
     };
 
     for (event_i, event) in events.into_iter().enumerate() {
-        let event_segment = SegmentByDistance::new(&origin, &segments[event.segment_index]);
+        let event_segment = SegmentByDistance::new(
+            &origin,
+            &segments[event.segment_index],
+            event.segment_index,
+            &ray,
+        );
         let event_dir = origin.dir(event.point);
+
+        // Starting segments are ordered by what comes after the event, ending ones by what came before
+        ray.set(SweepRay {
+            dir: event.point.dvec() - origin.dvec(),
+            side: if event.is_start() { 1.0 } else { -1.0 },
+        });
 
         trace!(
             "Processing event {event_i:2}: point {}, {} of {} (angle {:3.2} deg)",

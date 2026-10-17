@@ -126,14 +126,14 @@ pub fn panic_message(payload: Box<dyn Any + Send>) -> String {
 /// and the index of that segment.
 /// Computed in `f64` with no tolerances, to serve as a reference.
 pub fn ray_cast(origin: Point, dir: DVec2, segments: &[Segment]) -> Option<(f64, usize)> {
-    let q = dvec(origin);
+    let q = origin.dvec();
     let dir = dir.normalize();
 
     let mut nearest: Option<(f64, usize)> = None;
 
     for (i, segment) in segments.iter().enumerate() {
         let (a, b) = segment.ab();
-        let (a, b) = (dvec(a), dvec(b));
+        let (a, b) = (a.dvec(), b.dvec());
 
         let ab = b - a;
         let denominator = dir.perp_dot(ab);
@@ -193,7 +193,7 @@ pub fn check_visibility(
         match (expected, hits.as_slice()) {
             (None, []) => (),
             (Some((t, i)), [(t_out, s)]) => prop_assert!(
-                distance_to_segment(dvec(q) + dir * t, s) <= tolerance,
+                distance_to_segment(q.dvec() + dir * t, s) <= tolerance,
                 "Wrong output segment: at angle {angle}, expected {} at distance {t}, got {s} at distance {t_out}",
                 input[i],
             ),
@@ -226,7 +226,7 @@ pub fn check_visibility(
 /// walking from one end of `s` to the other through the segments that lie along it.
 fn is_along(s: &Segment, segments: &[Segment], tolerance: f64) -> bool {
     let (a, b) = s.ab();
-    let (a, b) = (dvec(a), dvec(b));
+    let (a, b) = (a.dvec(), b.dvec());
     let length = a.distance(b);
     let dir = (b - a) / length;
 
@@ -240,9 +240,9 @@ fn is_along(s: &Segment, segments: &[Segment], tolerance: f64) -> bool {
             .filter(|segment| distance_to_segment(p, segment) <= tolerance)
             .filter_map(|segment| {
                 let (c, d) = segment.ab();
-                let far = (dvec(c) - a)
+                let far = (c.dvec() - a)
                     .dot(dir)
-                    .max((dvec(d) - a).dot(dir))
+                    .max((d.dvec() - a).dot(dir))
                     .min(length);
                 let is_along = distance_to_segment(a + dir * far, segment) <= tolerance;
                 (far > reached && is_along).then_some(far)
@@ -258,13 +258,9 @@ fn is_along(s: &Segment, segments: &[Segment], tolerance: f64) -> bool {
     true
 }
 
-pub fn dvec(p: Point) -> DVec2 {
-    DVec2::new(p.x as f64, p.y as f64)
-}
-
 pub fn distance_to_segment(p: DVec2, segment: &Segment) -> f64 {
     let (a, b) = segment.ab();
-    let (a, b) = (dvec(a), dvec(b));
+    let (a, b) = (a.dvec(), b.dvec());
     let ab = b - a;
     let t = ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0);
     p.distance(a + ab * t)
@@ -278,14 +274,14 @@ pub fn sample_directions<'s>(
     extra: &[f64],
     tolerance: f64,
 ) -> Vec<f64> {
-    let q = dvec(q);
+    let q = q.dvec();
 
     let mut blocked = Vec::new();
 
     for segment in segments {
         let (a, b) = segment.ab();
 
-        for p in [dvec(a), dvec(b)] {
+        for p in [a.dvec(), b.dvec()] {
             let r = q.distance(p);
 
             if r <= tolerance {

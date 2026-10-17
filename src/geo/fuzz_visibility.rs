@@ -130,11 +130,10 @@ categories! {
 
     #[ignore = "fails 97%: mostly `Origin .. is on the segment`, double starts and ends"]
     light_on_segments: on_segments, Transform::IDENTITY;
-    #[ignore = "fails 32%: mostly `Origin .. is on the segment`"]
+    #[ignore = "fails 21%: mostly `Origin .. is on the segment`"]
     light_on_segment_lines: on_segment_lines, Transform::IDENTITY;
     #[ignore = "fails 45%: `Origin .. is on the segment` within 1e-4 of walls"]
     light_near_walls: near_walls, Transform::IDENTITY;
-    #[ignore = "fails 28%: intersecting segments in `cmp`"]
     light_near_corners: near_corners, Transform::IDENTITY;
     #[ignore = "fails 30%: `Origin .. is on the segment` within 1e-4 of map edges"]
     light_near_map_edges: near_map_edges, Transform::IDENTITY;
@@ -300,7 +299,6 @@ fn light_on_end_of_horizontal_wall() {
 }
 
 #[test]
-#[ignore = "Tried to compare segments that intersect: S1=[-0.5 -0.5]<=>[0.5 -0.5], S2=[0.5 -0.5]<=>[0.5 0.5]"]
 fn light_1e_6_off_corner_of_two_walls() {
     regression(rows(&["#"]), (0.49999905, -0.50000095), Transform::IDENTITY);
 }
