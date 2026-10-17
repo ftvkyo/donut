@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use anyhow::{Result, ensure};
 use bytemuck::Pod;
-use wgpu::util::DeviceExt;
 
 use crate::view::{
     DeferredLight, Quad, QuadEmitter,
@@ -47,20 +46,16 @@ impl<V: Pod, I: IndexFormat> VertexBuffers<V, I> {
     }
 
     fn buffer_init(gpu: &GPU, label: &str, usage: wgpu::BufferUsages, data: &[u8]) -> wgpu::Buffer {
-        let data_size = data.len();
-        let data_size_padded = Self::pad_buffer_size(data_size);
+        let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(label),
+            size: Self::pad_buffer_size(data.len()) as u64,
+            usage: usage | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
 
-        let mut data_padded = vec![0u8; data_size_padded];
-        for i in 0..data.len() {
-            data_padded[i] = data[i];
-        }
+        gpu.queue.write_buffer(&buffer, 0, data);
 
-        gpu.device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(label),
-                contents: &data_padded,
-                usage: usage | wgpu::BufferUsages::COPY_DST,
-            })
+        buffer
     }
 
     fn buffer_update(
@@ -70,28 +65,11 @@ impl<V: Pod, I: IndexFormat> VertexBuffers<V, I> {
         usage: wgpu::BufferUsages,
         data: &[u8],
     ) {
-        let buffer_size = buffer.size() as usize;
-
-        let data_size = data.len();
-        let data_size_padded = Self::pad_buffer_size(data_size).max(buffer_size);
-
-        let mut data_padded = vec![0u8; data_size_padded];
-        for i in 0..data.len() {
-            data_padded[i] = data[i];
-        }
-
-        if data_size_padded <= buffer_size {
-            gpu.queue
-                .write_buffer(&buffer, 0, bytemuck::cast_slice(&data_padded));
+        if data.len() <= buffer.size() as usize {
+            gpu.queue.write_buffer(buffer, 0, data);
         } else {
             buffer.destroy();
-            *buffer = gpu
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(label),
-                    contents: &data_padded,
-                    usage: usage | wgpu::BufferUsages::COPY_DST,
-                });
+            *buffer = Self::buffer_init(gpu, label, usage, data);
         }
     }
 
@@ -139,8 +117,6 @@ impl<V: Pod, I: IndexFormat> VertexBuffers<V, I> {
             wgpu::BufferUsages::INDEX,
             bytemuck::cast_slice(&idata),
         );
-
-        gpu.queue.submit([]);
 
         self.icount = idata.len();
 

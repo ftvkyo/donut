@@ -67,8 +67,6 @@ impl<const BINDINGS: usize> UniformGroup<BINDINGS> {
             gpu.queue.write_buffer(buffer, 0, data);
         }
 
-        gpu.queue.submit([]);
-
         Ok(())
     }
 
