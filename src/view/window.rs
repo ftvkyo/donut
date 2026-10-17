@@ -13,8 +13,11 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(gpu: &GPU, window: Arc<winit::window::Window>) -> Result<Self> {
-        let surface = gpu.instance.create_surface(window.clone()).unwrap();
+    pub fn new(
+        gpu: &GPU,
+        window: Arc<winit::window::Window>,
+        surface: wgpu::Surface<'static>,
+    ) -> Result<Self> {
         let capabilities = surface.get_capabilities(&gpu.adapter);
 
         let surface_format = capabilities

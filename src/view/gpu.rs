@@ -25,7 +25,6 @@ pub struct RenderConfig<'p> {
 }
 
 pub struct GPU {
-    pub instance: wgpu::Instance,
     pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -39,10 +38,12 @@ impl GPU {
         Fs::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
     ];
 
-    pub async fn new() -> Result<Self> {
-        let instance = wgpu::Instance::new(&Default::default());
+    pub async fn new(instance: &wgpu::Instance, surface: &wgpu::Surface<'_>) -> Result<Self> {
         let adapter = instance
-            .request_adapter(&Default::default())
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                compatible_surface: Some(surface),
+                ..Default::default()
+            })
             .await
             .context("Failed to acquire an adapter")?;
 
@@ -67,7 +68,6 @@ impl GPU {
             .context("Failed to acquire a device")?;
 
         Ok(Self {
-            instance,
             adapter,
             device,
             queue,

@@ -57,8 +57,10 @@ pub struct View {
 
 impl View {
     pub fn new(window: Arc<winit::window::Window>, assets: &Assets, game: &Game) -> Result<Self> {
-        let gpu = pollster::block_on(GPU::new())?;
-        let window = Window::new(&gpu, window)?;
+        let instance = wgpu::Instance::new(&Default::default());
+        let surface = instance.create_surface(window.clone())?;
+        let gpu = pollster::block_on(GPU::new(&instance, &surface))?;
+        let window = Window::new(&gpu, window, surface)?;
 
         let gpu_data = {
             let mut main_tmux = Vec::new();
