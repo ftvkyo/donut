@@ -77,7 +77,8 @@ impl Segment {
         let dir_segment = self.a.dir(self.b);
         let dir_point = self.a.dir(point);
 
-        let val = dir_segment.perp_dot(dir_point);
+        // Signed distance from the line defined by the segment
+        let val = dir_segment.perp_dot(dir_point) / dir_segment.length();
 
         if val.is_basically_zero() {
             return None;

@@ -375,9 +375,7 @@ proptest! {
 proptest! {
     #![proptest_config(config(ProptestConfig::default().cases, RngSeed::Random))]
 
-    /// Fails in about 66 of 10000 cases.
     #[test]
-    #[ignore = "segments shorter than 0.1 are misordered, compare Equal, or panic"]
     fn short_segments((ends, q, through) in general_scene(0.01..0.1)) {
         let segments = disjoint(&ends, GAP);
         check_all(&q, &crossed(q, through, &segments))?;
@@ -442,7 +440,6 @@ fn visibility_origin_near_corner() {
 }
 
 #[test]
-#[ignore = "cmp is Equal"]
 fn short_parallel_segments_ordered() {
     let near = seg((1.0, -0.005), (1.0, 0.005));
     let far = seg((1.008, -0.005), (1.008, 0.005));
@@ -451,7 +448,6 @@ fn short_parallel_segments_ordered() {
 }
 
 #[test]
-#[ignore = "the second insert is dropped"]
 fn short_parallel_segments_in_set() {
     let near = seg((1.0, -0.005), (1.0, 0.005));
     let far = seg((1.008, -0.005), (1.008, 0.005));
@@ -465,7 +461,6 @@ fn short_parallel_segments_in_set() {
 }
 
 #[test]
-#[ignore = "removes the other segment"]
 fn short_parallel_segments_removed_from_set() {
     let near = seg((1.0, -0.005), (1.0, 0.005));
     let far = seg((1.008, -0.005), (1.008, 0.005));
@@ -476,7 +471,6 @@ fn short_parallel_segments_removed_from_set() {
 }
 
 #[test]
-#[ignore = "cmp is Less one way and Equal the other"]
 fn short_segment_antisymmetric() {
     let short = seg((1.0, -0.005), (1.0, 0.005));
     let long = seg((1.005, -0.5), (1.005, 0.5));
@@ -486,7 +480,6 @@ fn short_segment_antisymmetric() {
 }
 
 #[test]
-#[ignore = "panics: 'S2 can't be on the same line as S1'"]
 fn short_segments_near_t() {
     // S1 points at the middle of S2 from 0.005 away
     let s1 = seg((0.005, 0.0), (0.015, 0.0));
@@ -547,7 +540,6 @@ fn s1_straddling_line_of_s2_rounding() {
 }
 
 #[test]
-#[ignore = "rounding in perp_dot exceeds the epsilon"]
 fn which_side_rounding() {
     let (q, _, [s1, s2]) = nearly_parallel();
     let (a, b) = s1.ab();
@@ -561,7 +553,6 @@ fn which_side_rounding() {
 }
 
 #[test]
-#[ignore = "absolute epsilon on the unnormalised perp_dot"]
 fn which_side_scale_invariant() {
     let long = seg((0.0, 0.0), (1.0, 0.0));
     assert_eq!(
