@@ -175,9 +175,8 @@ mod tests {
 
     use crate::{
         assets::Config,
-        geo::{Segment, VisibilityPolygon},
         phys::object::PhysObjectShape,
-        testing::ray_cast,
+        testing::{panic_message, ray_cast},
     };
 
     use super::*;
@@ -247,10 +246,7 @@ mod tests {
 
             for obj in game.physics.iter() {
                 if let Err(payload) = panic::catch_unwind(|| game.map.visibility_for(obj.center)) {
-                    let message = payload
-                        .downcast::<String>()
-                        .map_or_else(|_| String::new(), |m| *m);
-                    panics.push((time, obj.center, message));
+                    panics.push((time, obj.center, panic_message(payload)));
                 }
             }
         }
@@ -264,17 +260,5 @@ mod tests {
     fn lights_have_visibility_for_5_minutes() {
         let panics = play(300);
         assert!(panics.is_empty(), "{} panics: {panics:#?}", panics.len());
-    }
-
-    /// Shrunk from the first panic of `lights_have_visibility_for_5_minutes`, at 119 s.
-    #[test]
-    #[ignore = "Got a double start. Existing: [-14  2], New: [-14  2]"]
-    fn light_near_wall_line_below_tile_corner() {
-        let segments = [
-            Segment::new((-14.0, 2.0), (-14.0, 3.0)).unwrap(),
-            Segment::new((-15.0, 2.0), (-14.0, 2.0)).unwrap(),
-        ];
-
-        VisibilityPolygon::compute(Point::new(-14.000096, 1.544286), &segments);
     }
 }

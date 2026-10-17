@@ -1,7 +1,7 @@
 //! Shared helpers for tests: random tile maps, a brute-force ray caster,
 //! and a check of visibility polygons against it.
 
-use std::{f64::consts::TAU, fmt::Display};
+use std::{any::Any, f64::consts::TAU, fmt::Display};
 
 use glam::DVec2;
 use proptest::prelude::*;
@@ -95,6 +95,16 @@ pub fn tile_grid(max_size: u32, density: f64) -> impl Strategy<Value = TileGrid>
             }
         })
     })
+}
+
+/// The message of a panic caught by `std::panic::catch_unwind`.
+pub fn panic_message(payload: Box<dyn Any + Send>) -> String {
+    match payload.downcast::<String>() {
+        Ok(message) => *message,
+        Err(payload) => payload
+            .downcast::<&str>()
+            .map_or_else(|_| String::new(), |message| message.to_string()),
+    }
 }
 
 /// Distance along the ray from `origin` in direction `dir` to the nearest of `segments`,
@@ -233,11 +243,11 @@ fn is_along(s: &Segment, segments: &[Segment], tolerance: f64) -> bool {
     true
 }
 
-fn dvec(p: Point) -> DVec2 {
+pub fn dvec(p: Point) -> DVec2 {
     DVec2::new(p.x as f64, p.y as f64)
 }
 
-fn distance_to_segment(p: DVec2, segment: &Segment) -> f64 {
+pub fn distance_to_segment(p: DVec2, segment: &Segment) -> f64 {
     let (a, b) = segment.ab();
     let (a, b) = (dvec(a), dvec(b));
     let ab = b - a;

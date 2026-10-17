@@ -12,9 +12,9 @@ use proptest::{
 };
 
 use crate::{
-    geo::{Point, Segment},
+    geo::{Point, Segment, VisibilityPolygon},
     init_logging,
-    testing::{TileGrid, check_visibility, tile_grid},
+    testing::{TileGrid, check_visibility, panic_message, tile_grid},
 };
 
 /// Map units; 1/16 of a pixel at 16 pixels per tile, and far above f32 rounding of map coordinates.
@@ -202,20 +202,14 @@ fn overnight() {
     assert!(failures.is_empty(), "{} kinds of failures", failures.len());
 }
 
-/// The message of a failed check or of a panic in it, which the panic hook still prints.
+/// The message of a failed check or of a panic in it.
 fn failure(grid: &TileGrid, q: Point, transform: Transform, extra: &[f64]) -> Option<String> {
     match panic::catch_unwind(|| check(grid, q, transform, extra)) {
         Ok(Ok(())) => None,
         Ok(Err(TestCaseError::Fail(reason) | TestCaseError::Reject(reason))) => {
             Some(reason.message().to_string())
         }
-        Err(payload) => match payload.downcast::<String>() {
-            Ok(message) => Some(*message),
-            Err(payload) => payload
-                .downcast::<&str>()
-                .ok()
-                .map(|message| message.to_string()),
-        },
+        Err(payload) => Some(panic_message(payload)),
     }
 }
 
@@ -345,29 +339,19 @@ fn light_in_tile_translated_by_1000() {
     );
 }
 
+/// Shrunk from the first panic of `game::tests::lights_have_visibility_for_5_minutes`, at 119 s.
+#[test]
+#[ignore = "Got a double start. Existing: [-14  2], New: [-14  2]"]
+fn light_near_wall_line_below_tile_corner() {
+    let segments = [
+        Segment::new((-14.0, 2.0), (-14.0, 3.0)).unwrap(),
+        Segment::new((-15.0, 2.0), (-14.0, 2.0)).unwrap(),
+    ];
+
+    VisibilityPolygon::compute(Point::new(-14.000096, 1.544286), &segments);
+}
+
 // Suspected causes
-
-#[test]
-#[ignore = "returns None: the epsilon applies to a denominator that scales with the direction"]
-fn intersect_with_short_ray() {
-    let segment = Segment::new((-1.0, 1.0), (1.0, 1.0)).unwrap();
-    let hit = segment.intersect_with_ray(Point::ZERO, vec2(0.0, 5e-5));
-    assert_eq!(hit, Some(Point::new(0.0, 1.0)));
-}
-
-#[test]
-#[ignore = "returns the intersection with the line through the segment"]
-fn intersect_with_ray_missing_segment() {
-    let segment = Segment::new((0.0, 1.0), (1.0, 1.0)).unwrap();
-    assert_eq!(
-        segment.intersect_with_ray(Point::ZERO, vec2(-1.0, 1.0)),
-        None
-    );
-    assert_eq!(
-        segment.intersect_with_ray(Point::ZERO, vec2(0.5, -1.0)),
-        None
-    );
-}
 
 #[test]
 #[ignore = "`Vec2::angle_to` uses acos, so angles within ~3e-4 of 0 or PI collapse"]

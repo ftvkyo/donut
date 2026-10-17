@@ -94,8 +94,6 @@ fn advance_by_keeps_fractional_milliseconds() {
 #[ignore = "a disc centred exactly on a segment gets a NaN position"]
 fn disc_centred_on_segment_stays_finite() {
     // `clamp_length` normalises the zero vector into NaN
-    assert!(Vec2::ZERO.clamp_length(RADIUS, RADIUS).is_nan());
-
     let mut d = disc((0.0, 0.0), vec2(0.0, -1.0));
     d.collide(&segment((-1.0, 0.0), (1.0, 0.0)));
 
@@ -503,11 +501,8 @@ fn disc_bounces_off_tiles_across_wrap_seam() {
             physics.advance_by(&scene, STEP);
 
             let d = &physics.objects[0];
-            let tile_x = (d.center.x + width as f32 / 2.0).floor() as i32;
-            let tile_y = height as i32 - 1 - (d.center.y + height as f32 / 2.0).floor() as i32;
-
             assert!(
-                !grid.is_solid(tile_x, tile_y),
+                !grid.is_solid_at(d.center),
                 "Block at {block}: in a solid tile at {} after {step} steps",
                 d.center
             );

@@ -1,12 +1,11 @@
 #[cfg(test)]
+mod fuzz_segment;
+#[cfg(test)]
 mod fuzz_visibility;
 mod point;
 mod segment;
 mod torus;
 mod visibility;
-
-#[cfg(test)]
-mod fuzz_segment;
 
 use glam::Vec2;
 
