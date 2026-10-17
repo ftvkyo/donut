@@ -61,6 +61,7 @@ impl View {
         let surface = instance.create_surface(window.clone())?;
         let gpu = pollster::block_on(GPU::new(&instance, &surface))?;
         let window = Window::new(&gpu, window, surface)?;
+        window.configure(&gpu);
 
         let gpu_data = {
             let mut main_tmux = Vec::new();
