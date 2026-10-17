@@ -77,10 +77,10 @@ impl Segment {
         let dir_segment = self.a.dir(self.b);
         let dir_point = self.a.dir(point);
 
-        // Signed distance from the line defined by the segment
-        let val = dir_segment.perp_dot(dir_point) / dir_segment.length();
+        // Signed distance from the line defined by the segment, times its length
+        let val = dir_segment.perp_dot(dir_point);
 
-        if val.is_basically_zero() {
+        if val * val <= f32::E * f32::E * dir_segment.length_squared() {
             return None;
         }
 
