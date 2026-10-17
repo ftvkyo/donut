@@ -139,7 +139,7 @@ impl VisibilityPolygon {
                     unreachable!("Got a double end. Existing: {existing_end}, New: {end}")
                 }
                 (EventKind::End, end, None, None) => {
-                    trace!(" -> Saving {end} as a start of a segment!");
+                    trace!(" -> Saving {end} as an end of a segment!");
                     vis_acc_end = Some(end);
                 }
                 (EventKind::End, end, Some(start), _) => {
