@@ -157,11 +157,6 @@ impl VertexBuffers<Vertex, VertexIndex> {
         let (vdata, idata) = Self::convert(quads);
         Self::new(gpu, &vdata, &idata)
     }
-
-    pub fn update_quads(&mut self, gpu: &GPU, quads: &[Quad]) -> Result<()> {
-        let (vdata, idata) = Self::convert(quads);
-        self.update(gpu, &vdata, &idata)
-    }
 }
 
 impl VertexBuffers<VertexEmitter, VertexIndex> {

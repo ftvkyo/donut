@@ -17,6 +17,5 @@ pub use texture_multiplexer::TextureMultiplexer;
 
 pub use uniform::UniformGroup;
 
-pub use vertex::IndexFormat;
 pub use vertex::VertexBuffers;
 pub use vertex::VertexData;

@@ -103,10 +103,6 @@ impl Assets {
             .with_context(|| format!("No light animation '{name}'"))
     }
 
-    pub fn get_light(&self, index: usize) -> Option<&LightSource> {
-        self.lights.get(index)
-    }
-
     pub fn all_lights(&self) -> impl Iterator<Item = (usize, &LightSource)> {
         self.lights.iter().enumerate()
     }
@@ -165,10 +161,6 @@ impl Assets {
             .enumerate()
             .find(|(_, m)| m.name == name)
             .with_context(|| format!("No map '{name}'"))
-    }
-
-    pub fn get_map(&self, index: usize) -> Option<&Map> {
-        self.maps.get(index)
     }
 
     pub fn all_tilesets(&self) -> impl Iterator<Item = (usize, &Tileset)> {

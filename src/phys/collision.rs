@@ -21,9 +21,6 @@ impl<M> CollideWith<&SceneObject> for PhysObject<M> {
         use SceneObjectShape::*;
 
         match (self.shape, with.shape) {
-            (Disc { radius }, SegmentH { dx }) => todo!(),
-            (Disc { radius }, SegmentV { dy }) => todo!(),
-
             (Disc { radius }, Segment { dx, dy }) => {
                 let (sa, sb) = (
                     with.center - vec2(dx, dy) / 2.0,

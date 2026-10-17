@@ -4,8 +4,6 @@ use crate::{geo::Point, phys::collision::VelocityAccumulator};
 
 #[derive(Clone, Copy, Debug)]
 pub enum SceneObjectShape {
-    SegmentH { dx: f32 },
-    SegmentV { dy: f32 },
     Segment { dx: f32, dy: f32 },
 }
 
@@ -16,14 +14,6 @@ pub struct SceneObject {
 }
 
 impl SceneObject {
-    pub fn new_segment_h(start: Point, dx: f32) -> Self {
-        todo!()
-    }
-
-    pub fn new_segment_v(start: Point, dy: f32) -> Self {
-        todo!()
-    }
-
     pub fn new_segment(start: Point, end: Point) -> Self {
         Self {
             center: start.midpoint(end),
@@ -97,30 +87,6 @@ impl<M> PhysObject<M> {
     }
 
     pub fn with_meta<N>(self, meta: N) -> PhysObject<N> {
-        let Self {
-            center,
-            shape,
-            mass,
-            velocity_linear,
-            velocity_angular,
-            velocity_acc,
-            ..
-        } = self;
-
-        PhysObject {
-            center,
-            shape,
-            mass,
-            velocity_linear,
-            velocity_angular,
-            meta,
-            velocity_acc,
-        }
-    }
-
-    pub fn map_meta<N>(self, meta_f: impl FnOnce(&Self) -> N) -> PhysObject<N> {
-        let meta = meta_f(&self);
-
         let Self {
             center,
             shape,

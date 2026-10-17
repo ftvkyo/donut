@@ -73,26 +73,6 @@ impl<M> Physics<M> {
         }
     }
 
-    fn for_each_pair_mut(&mut self, mut f: impl FnMut(&mut PhysObject<M>, &mut PhysObject<M>)) {
-        for i in 0..self.objects.len() {
-            for j in 0..self.objects.len() {
-                if i == j {
-                    continue;
-                }
-
-                let (left_i, right_i) = if i < j {
-                    (i, j - i - 1)
-                } else {
-                    (j, i - j - 1)
-                };
-
-                let (left, right) = self.objects.split_at_mut(left_i + 1);
-
-                f(&mut left[left_i], &mut right[right_i]);
-            }
-        }
-    }
-
     fn for_each_distinct_pair_mut(
         &mut self,
         mut f: impl FnMut(&mut PhysObject<M>, &mut PhysObject<M>),

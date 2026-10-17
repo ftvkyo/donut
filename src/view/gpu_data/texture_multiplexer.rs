@@ -5,7 +5,8 @@ use crate::view::{gpu::GPU, gpu_data::TextureGroup};
 pub struct TextureMultiplexer {
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
-    groups: Vec<TextureGroup>,
+    /// Owns the textures that `bind_group` refers to
+    _groups: Vec<TextureGroup>,
 }
 
 impl TextureMultiplexer {
@@ -70,7 +71,7 @@ impl TextureMultiplexer {
         Ok(Self {
             bind_group_layout,
             bind_group,
-            groups,
+            _groups: groups,
         })
     }
 
@@ -80,9 +81,5 @@ impl TextureMultiplexer {
 
     pub fn get_bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
-    }
-
-    pub fn get_texture_group(&self, index: usize) -> Option<&TextureGroup> {
-        self.groups.get(index)
     }
 }
