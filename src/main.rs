@@ -6,7 +6,7 @@ use log::{debug, error, info};
 use donut::{App, Assets, Config, Game, init_logging};
 
 fn run() -> Result<()> {
-    use winit::event_loop::{ControlFlow, EventLoop};
+    use winit::event_loop::EventLoop;
 
     let dir_cargo = Path::new(env!("CARGO_MANIFEST_DIR"));
     let dir_assets = dir_cargo.join("assets");
@@ -16,7 +16,6 @@ fn run() -> Result<()> {
 
     debug!("Creating event loop...");
     let event_loop = EventLoop::new()?;
-    event_loop.set_control_flow(ControlFlow::Poll);
 
     debug!("Initialising game state...");
     let game = Game::new(&assets)?;
