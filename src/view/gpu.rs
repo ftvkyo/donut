@@ -55,8 +55,12 @@ impl GPU {
             bail!("The adapter is missing the following features: {missing_features}");
         }
 
-        let mut required_limits = wgpu::Limits::default();
-        required_limits.max_binding_array_elements_per_shader_stage = 4;
+        let required_limits = wgpu::Limits {
+            max_binding_array_elements_per_shader_stage: adapter
+                .limits()
+                .max_binding_array_elements_per_shader_stage,
+            ..Default::default()
+        };
 
         let (device, queue) = adapter
             .request_device(&wgpu::wgt::DeviceDescriptor {
