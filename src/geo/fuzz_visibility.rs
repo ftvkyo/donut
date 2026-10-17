@@ -128,18 +128,18 @@ categories! {
     light_on_empty_corners: on_empty_corners, Transform::IDENTITY;
     light_on_grid_lines: on_grid_lines, Transform::IDENTITY;
 
-    #[ignore = "fails 83%: mostly `Origin .. is on the segment`, intersecting segments in `cmp`"]
+    #[ignore = "fails 97%: mostly `Origin .. is on the segment`, double starts and ends"]
     light_on_segments: on_segments, Transform::IDENTITY;
-    #[ignore = "fails 46%: mostly `Origin .. is on the segment`, double starts and ends"]
+    #[ignore = "fails 32%: mostly `Origin .. is on the segment`"]
     light_on_segment_lines: on_segment_lines, Transform::IDENTITY;
-    #[ignore = "fails 52%: mostly `Origin .. is on the segment`, double starts and ends"]
+    #[ignore = "fails 45%: `Origin .. is on the segment` within 1e-4 of walls"]
     light_near_walls: near_walls, Transform::IDENTITY;
-    #[ignore = "fails 46%: intersecting segments in `cmp`, double starts and ends, stray segments"]
+    #[ignore = "fails 28%: intersecting segments in `cmp`"]
     light_near_corners: near_corners, Transform::IDENTITY;
-    #[ignore = "fails 44%: `Origin .. is on the segment`"]
+    #[ignore = "fails 30%: `Origin .. is on the segment` within 1e-4 of map edges"]
     light_near_map_edges: near_map_edges, Transform::IDENTITY;
 
-    #[ignore = "fails 99%: panics in `cmp` and in the sweep"]
+    #[ignore = "fails 2.5%: gaps"]
     light_in_empty_tiles_scaled_by_0_01: in_empty_tiles, Transform::new(0.01, 0.0);
     light_in_empty_tiles_scaled_by_0_1: in_empty_tiles, Transform::new(0.1, 0.0);
     light_in_empty_tiles_scaled_by_10: in_empty_tiles, Transform::new(10.0, 0.0);
@@ -273,7 +273,6 @@ fn light_1e_4_from_wall() {
 }
 
 #[test]
-#[ignore = "Origin [ 0 9.9995] is on the segment [-17 10]<=>[17 10]"]
 fn light_5e_4_from_map_edge() {
     let empty = ".".repeat(32);
     regression(

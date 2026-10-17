@@ -72,7 +72,7 @@ impl VisibilityPolygon {
                 continue;
             }
 
-            if angle_diff.is_basically_equal(&PI) {
+            if angle_diff.is_basically_equal(&PI) && segment.which_side(origin).is_none() {
                 panic!("Origin {origin} is on the segment {segment}");
             }
 
