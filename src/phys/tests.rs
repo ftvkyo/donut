@@ -5,6 +5,7 @@ use std::time::Duration;
 use glam::{Vec2, vec2};
 
 use crate::{
+    assets::collision_segments,
     geo::{Point, Segment, ToricGeometry},
     phys::{
         Physics,
@@ -474,7 +475,6 @@ fn wrapping_disc_never_reaches_map_edges() {
 }
 
 #[test]
-#[ignore = "collisions ignore the wrapping, so discs wrap into tiles at the opposite map edge"]
 fn disc_bounces_off_tiles_across_wrap_seam() {
     let (width, height) = (8, 4);
 
@@ -489,7 +489,8 @@ fn disc_bounces_off_tiles_across_wrap_seam() {
             height: height as u32,
             solid,
         };
-        let scene = scene(&grid.segments());
+        let segments = collision_segments(grid.width, grid.height, &[|x, y| grid.is_solid(x, y)]);
+        let scene = scene(&segments);
 
         let mut physics = toric_physics(&grid);
         physics.add(disc((0.0, -1.0 + RADIUS), vec2(speed, 0.0)));
@@ -510,4 +511,21 @@ fn disc_bounces_off_tiles_across_wrap_seam() {
 
         assert!(bounced, "Block at {block}: no bounce");
     }
+}
+
+#[test]
+fn discs_collide_across_wrap_seam() {
+    let grid = TileGrid::from_rows(&["........"; 4]);
+
+    let mut physics = toric_physics(&grid);
+    physics.add(disc((-4.0 + RADIUS * 0.75, 0.0), Vec2::NEG_X));
+    physics.add(disc((4.0 - RADIUS * 0.75, 0.0), Vec2::X));
+
+    physics.advance_by(&[], STEP);
+
+    let [d1, d2] = &physics.objects[..] else {
+        unreachable!()
+    };
+    assert!(d1.velocity_linear.x > 0.0, "{}", d1.velocity_linear);
+    assert!(d2.velocity_linear.x < 0.0, "{}", d2.velocity_linear);
 }

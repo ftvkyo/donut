@@ -46,8 +46,13 @@ impl<M> Physics<M> {
                     step.min(radius / 2.0 / obj.velocity_linear.length())
                 });
 
+            let geometry = self.geometry.clone();
             self.for_each_distinct_pair_mut(|obj1, obj2| {
-                obj1.collide(obj2);
+                // Collide with the copy of `obj2` across the wrap that is nearest to `obj1`
+                let offset = obj2.center.dir(geometry.nearest(obj1.center, obj2.center));
+                obj2.center += offset;
+                obj1.collide(&mut *obj2);
+                obj2.center -= offset;
             });
 
             self.for_each_mut(|obj| {

@@ -7,6 +7,14 @@ pub struct ToricGeometry {
 }
 
 impl ToricGeometry {
+    /// The copy of `point` nearest to `from`.
+    pub fn nearest(&self, from: Point, point: Point) -> Point {
+        let mut dir = from.dir(point);
+        dir.x -= self.x * (dir.x / self.x).round();
+        dir.y -= self.y * (dir.y / self.y).round();
+        from + dir
+    }
+
     pub fn wrap(&self, point: &mut Point) {
         if point.x < -self.x / 2.0 {
             point.x += self.x;

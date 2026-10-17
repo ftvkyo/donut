@@ -7,7 +7,7 @@ use glam::DVec2;
 use proptest::prelude::*;
 
 use crate::{
-    assets::collision_segments,
+    assets::tile_edges,
     geo::{Point, Segment, compute_visibility},
 };
 
@@ -47,11 +47,13 @@ impl TileGrid {
         self.is_solid(x, y)
     }
 
-    /// Tile edges, built the same way as the collision segments of a map loaded from a file,
+    /// Edges between solid and empty tiles, built the same way as for a map loaded from a file,
     /// plus edges one unit around the map.
     pub fn segments(&self) -> Vec<Segment> {
-        let mut segments =
-            collision_segments(self.width, self.height, &[|x, y| self.is_solid(x, y)]);
+        let (w, h) = (self.width as i32, self.height as i32);
+        let mut segments = tile_edges(self.width, self.height, 0..w, 0..h, |x, y| {
+            self.is_solid(x, y)
+        });
 
         let x = self.width as f32 / 2.0 + 1.0;
         let y = self.height as f32 / 2.0 + 1.0;

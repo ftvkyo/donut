@@ -184,8 +184,9 @@ fn tile_layers<'m>(
     Ok(layers)
 }
 
-/// Segments between solid and empty tiles of the colliding layers.
-/// A tile is solid if it is solid in any colliding layer, and tiles outside the map are empty.
+/// Segments between solid and empty tiles of the colliding layers, with a tile of the map
+/// repeated around it, so that objects near its edges collide across them.
+/// A tile is solid if it is solid in any colliding layer.
 /// The map is centered on (0, 0), its tiles are 1 unit wide, and `y = 0` is its top row.
 pub fn collision_segments(
     width: u32,
@@ -195,14 +196,15 @@ pub fn collision_segments(
     let (w, h) = (width as i32, height as i32);
 
     let is_solid = |x: i32, y: i32| {
-        (0..w).contains(&x)
-            && (0..h).contains(&y)
-            && colliding_layers
-                .iter()
-                .any(|layer_is_solid| layer_is_solid(x, y))
+        let x = x.rem_euclid(w);
+        let y = y.rem_euclid(h);
+
+        colliding_layers
+            .iter()
+            .any(|layer_is_solid| layer_is_solid(x, y))
     };
 
-    tile_edges(width, height, 0..w, 0..h, is_solid)
+    tile_edges(width, height, -1..w + 1, -1..h + 1, is_solid)
 }
 
 /// Segments between solid and empty tiles of the occluding layers, in buckets for computing
@@ -254,7 +256,7 @@ pub fn occlusion_buckets(
 /// Edges between solid and empty tiles in `xs` by `ys` of a map of `width` by `height` tiles,
 /// with aligned edges of neighbouring tiles joined into one segment.
 /// Empty tiles are on the left of each segment.
-fn tile_edges(
+pub(crate) fn tile_edges(
     width: u32,
     height: u32,
     xs: Range<i32>,
@@ -373,7 +375,7 @@ mod tests {
         edge
     }
 
-    /// Unit edges between solid and empty tiles, with the same coordinates as `collision_segments`.
+    /// Unit edges between solid and empty tiles, with the same coordinates as `tile_edges`.
     fn unit_edges(grid: &TileGrid) -> BTreeSet<UnitEdge> {
         let (w2, h2) = (grid.width as f32 / 2.0, grid.height as f32 / 2.0);
         let mut edges = BTreeSet::new();
@@ -411,9 +413,9 @@ mod tests {
         })]
 
         #[test]
-        fn collision_segments_join_unit_edges(grid in tile_grid(12, 0.4)) {
-            let segments =
-                collision_segments(grid.width, grid.height, &[|x, y| grid.is_solid(x, y)]);
+        fn tile_edges_join_unit_edges(grid in tile_grid(12, 0.4)) {
+            let (w, h) = (grid.width as i32, grid.height as i32);
+            let segments = tile_edges(grid.width, grid.height, 0..w, 0..h, |x, y| grid.is_solid(x, y));
 
             let mut joined = BTreeSet::new();
             for segment in &segments {
@@ -478,9 +480,9 @@ mod tests {
         }
 
         #[test]
-        fn collision_segments_have_empty_tiles_on_their_left(grid in tile_grid(12, 0.4)) {
-            let segments =
-                collision_segments(grid.width, grid.height, &[|x, y| grid.is_solid(x, y)]);
+        fn tile_edges_have_empty_tiles_on_their_left(grid in tile_grid(12, 0.4)) {
+            let (w, h) = (grid.width as i32, grid.height as i32);
+            let segments = tile_edges(grid.width, grid.height, 0..w, 0..h, |x, y| grid.is_solid(x, y));
 
             for segment in &segments {
                 let (a, b) = segment.ab();

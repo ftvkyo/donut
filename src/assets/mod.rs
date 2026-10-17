@@ -17,6 +17,8 @@ pub use light::LightSource;
 pub use map::Map;
 pub use map::collision_segments;
 pub use map::occlusion_buckets;
+#[cfg(test)]
+pub(crate) use map::tile_edges;
 pub use texture::TextureData;
 pub use texture::TexturePixel;
 pub use tileset::Tileset;
