@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use glam::{Vec2, Vec3, Vec4, vec2};
+use glam::{Vec3, Vec4, vec2};
 use palette::{FromColor, LinSrgb, OklabHue, Oklch};
 
 pub mod camera;
@@ -148,7 +148,7 @@ impl<'assets> Game<'assets> {
                 light_asset,
             } = obj.meta;
 
-            let rot = Vec2::X.angle_to(obj.velocity_linear);
+            let rot = obj.velocity_linear.to_angle();
 
             let frame = (time_ms / light_asset.ms_per_frame) % light_asset.frames;
             let frame_w = light_asset.frame_size[0] as f32;
@@ -171,7 +171,7 @@ impl<'assets> Game<'assets> {
 mod tests {
     use std::{panic, path::Path, time::Duration};
 
-    use glam::DVec2;
+    use glam::{DVec2, Vec2};
 
     use crate::{
         assets::Config,

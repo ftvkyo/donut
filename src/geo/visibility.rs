@@ -4,7 +4,6 @@ use std::{
     fmt::Display,
 };
 
-use glam::vec2;
 use log::{Level, log_enabled, trace};
 
 use crate::geo::ImpreciseEq;
@@ -57,16 +56,14 @@ pub struct VisibilityPolygon {
 impl VisibilityPolygon {
     /// Note: segments must not intersect except at their endpoints.
     pub fn compute(origin: Point, segments: &[Segment]) -> Self {
-        let angle0 = vec2(1.0, 0.0);
-
         // Segment start and end events.
         let mut events = Vec::with_capacity(segments.len() * 2);
 
         for (segment_index, segment) in segments.iter().enumerate() {
             let (point_a, point_b) = segment.ab();
 
-            let point_a_angle = angle0.angle_to(origin.dir(point_a));
-            let point_b_angle = angle0.angle_to(origin.dir(point_b));
+            let point_a_angle = origin.dir(point_a).to_angle();
+            let point_b_angle = origin.dir(point_b).to_angle();
 
             let angle_diff = (point_a_angle - point_b_angle).abs();
 

@@ -1,7 +1,7 @@
 //! Property tests of `VisibilityPolygon::compute` on random tile maps, against `ray_cast`.
 //! Light positions are split into categories, so that a failure in one does not hide the others.
 
-use std::{collections::BTreeMap, f32::consts::PI, f64::consts::TAU, panic};
+use std::{collections::BTreeMap, f64::consts::TAU, panic};
 
 use glam::{Vec2, vec2};
 use proptest::{
@@ -232,7 +232,6 @@ fn regression(rows: &[&str], q: (f32, f32), transform: Transform) {
 }
 
 #[test]
-#[ignore = "Stray output segment: [-8.268593  0]<=>[-10 -2] does not lie along input segments"]
 fn light_0_012_from_line_of_far_walls() {
     let rows = ["................#.", "...............#.#"];
     regression(&rows, (-8.45553, -0.012243271), Transform::IDENTITY);
@@ -276,7 +275,6 @@ fn light_on_end_of_vertical_wall() {
 }
 
 #[test]
-#[ignore = "Could not match the remaining points! Remaining start: None, Remaining end: Some(..)"]
 fn light_on_end_of_horizontal_wall() {
     regression(&["#"], (-0.5, -0.5), Transform::IDENTITY);
 }
@@ -313,7 +311,6 @@ fn light_1e_4_from_wall_line_beyond_its_end() {
 }
 
 #[test]
-#[ignore = "Wrong output segment: expected [ 2 -0.5]<=>[ 2 0.5], got [2.9999998 -0.5006663]<=>[ 3 1.5]"]
 fn light_along_row_of_walls_sees_through_its_end() {
     regression(&["####"], (-2.001, -0.49900007), Transform::IDENTITY);
 }
@@ -341,18 +338,6 @@ fn light_near_wall_line_below_tile_corner() {
     ];
 
     VisibilityPolygon::compute(Point::new(-14.000096, 1.544286), &segments);
-}
-
-// Suspected causes
-
-#[test]
-#[ignore = "`Vec2::angle_to` uses acos, so angles within ~3e-4 of 0 or PI collapse"]
-fn angle_to_near_0_and_pi() {
-    let angle = Vec2::X.angle_to(vec2(1.0, 1e-4));
-    assert!((angle - 1e-4).abs() < 1e-6, "{angle}");
-
-    let angle = Vec2::X.angle_to(vec2(-1.0, 1e-4));
-    assert!((angle - (PI - 1e-4)).abs() < 1e-6, "{angle}");
 }
 
 // Light positions
