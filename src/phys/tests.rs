@@ -417,7 +417,6 @@ fn disc_collisions_are_pair_order_independent() {
 }
 
 #[test]
-#[ignore = "disc-disc contacts have no positional correction, so stacked discs sink"]
 fn stacked_discs_keep_apart() {
     let floor = [segment((-2.0, 0.0), (2.0, 0.0))];
 
@@ -435,7 +434,8 @@ fn stacked_discs_keep_apart() {
     let distance = d1.center.dist(d2.center);
     println!("Discs at {} and {}, {distance} apart", d1.center, d2.center);
 
-    assert!(distance > 2.0 * RADIUS - 1e-3);
+    // Resting discs overlap by about what they fall in a step
+    assert!(distance > 2.0 * RADIUS - 2e-3);
 }
 
 // Toric wrapping

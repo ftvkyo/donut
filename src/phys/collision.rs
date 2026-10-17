@@ -152,6 +152,12 @@ impl<M1, M2> CollideWith<&mut PhysObject<M2>> for PhysObject<M1> {
                         self.velocity_acc.velocity_linear -= normal * impulse / self.mass;
                         with.velocity_acc.velocity_linear += normal * impulse / with.mass;
                     }
+
+                    // Push the discs apart, the lighter one further
+                    let overlap = r1 + r2 - d_sq.sqrt();
+                    let push = normal * overlap / (1.0 / self.mass + 1.0 / with.mass);
+                    self.center -= push / self.mass;
+                    with.center += push / with.mass;
                 }
             }
         }
