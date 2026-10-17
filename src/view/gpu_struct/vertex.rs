@@ -2,7 +2,7 @@ use std::mem::offset_of;
 
 use bytemuck::{Pod, Zeroable};
 
-pub type VertexIndex = u16;
+pub type VertexIndex = u32;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]

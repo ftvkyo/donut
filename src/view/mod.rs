@@ -19,7 +19,7 @@ use crate::{
             DeferredInput, DeferredInputViews, DeferredTextureGroup, TextureDepth, TextureGroup,
             TextureMultiplexer, UniformGroup, VertexBuffers,
         },
-        gpu_struct::vertex::{Vertex, VertexDeferred, VertexEmitter},
+        gpu_struct::vertex::{Vertex, VertexDeferred, VertexEmitter, VertexIndex},
     },
 };
 
@@ -34,14 +34,14 @@ struct ViewGPUData {
     pub depth: TextureDepth,
 
     pub map_tmux: TextureMultiplexer,
-    pub map_quads: VertexBuffers<Vertex, u16>,
+    pub map_quads: VertexBuffers<Vertex, VertexIndex>,
 
     pub deferred_textures: DeferredTextureGroup,
     pub deferred_inputs: DeferredInput,
-    pub deferred_lights: VertexBuffers<VertexDeferred, u16>,
+    pub deferred_lights: VertexBuffers<VertexDeferred, VertexIndex>,
 
     pub light_emitters_tmux: TextureMultiplexer,
-    pub light_emitters_quads: VertexBuffers<VertexEmitter, u16>,
+    pub light_emitters_quads: VertexBuffers<VertexEmitter, VertexIndex>,
 }
 
 pub struct View {

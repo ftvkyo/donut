@@ -40,9 +40,9 @@ impl DeferredLight {
                 // The central vertex
                 offset,
                 // The second vertex
-                offset + segment_i as u16 * 2 + 1,
+                offset + segment_i as VertexIndex * 2 + 1,
                 // The third vertex
-                offset + segment_i as u16 * 2 + 2,
+                offset + segment_i as VertexIndex * 2 + 2,
             ]
         })
     }

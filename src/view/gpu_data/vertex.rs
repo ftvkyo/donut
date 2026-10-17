@@ -16,14 +16,6 @@ pub trait IndexFormat: Pod {
     fn format() -> wgpu::IndexFormat;
 }
 
-impl IndexFormat for u16 {
-    const MAX: usize = Self::MAX as usize;
-
-    fn format() -> wgpu::IndexFormat {
-        wgpu::IndexFormat::Uint16
-    }
-}
-
 impl IndexFormat for u32 {
     const MAX: usize = Self::MAX as usize;
 
@@ -174,13 +166,13 @@ impl<V: Pod, I: IndexFormat> VertexData for VertexBuffers<V, I> {
     }
 }
 
-impl VertexBuffers<Vertex, u16> {
+impl VertexBuffers<Vertex, VertexIndex> {
     fn convert(quads: &[Quad]) -> (Vec<Vertex>, Vec<VertexIndex>) {
         let mut vdata = Vec::with_capacity(quads.len() * 4);
         let mut idata = Vec::with_capacity(quads.len() * 6);
         for (i, quad) in quads.iter().enumerate() {
             vdata.extend_from_slice(&quad.vertex_data());
-            idata.extend_from_slice(&quad.index_data(i as u16 * 4));
+            idata.extend_from_slice(&quad.index_data(i as VertexIndex * 4));
         }
         (vdata, idata)
     }
@@ -196,7 +188,7 @@ impl VertexBuffers<Vertex, u16> {
     }
 }
 
-impl VertexBuffers<VertexEmitter, u16> {
+impl VertexBuffers<VertexEmitter, VertexIndex> {
     fn convert(
         quads: impl ExactSizeIterator<Item = QuadEmitter>,
     ) -> (Vec<VertexEmitter>, Vec<VertexIndex>) {
@@ -204,7 +196,7 @@ impl VertexBuffers<VertexEmitter, u16> {
         let mut idata = Vec::with_capacity(quads.len() * 6);
         for (i, quad) in quads.enumerate() {
             vdata.extend_from_slice(&quad.vertex_data());
-            idata.extend_from_slice(&quad.index_data(i as u16 * 4));
+            idata.extend_from_slice(&quad.index_data(i as VertexIndex * 4));
         }
         (vdata, idata)
     }
@@ -227,14 +219,14 @@ impl VertexBuffers<VertexEmitter, u16> {
     }
 }
 
-impl VertexBuffers<VertexDeferred, u16> {
+impl VertexBuffers<VertexDeferred, VertexIndex> {
     fn convert(
         lights: impl ExactSizeIterator<Item = DeferredLight>,
     ) -> (Vec<VertexDeferred>, Vec<VertexIndex>) {
         let mut vdata = Vec::new();
         let mut idata = Vec::new();
         for light in lights {
-            let vertices_now = vdata.len() as u16;
+            let vertices_now = vdata.len() as VertexIndex;
             vdata.extend(light.vertex_data());
             idata.extend(light.index_data(vertices_now));
         }
